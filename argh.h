@@ -139,7 +139,8 @@ extern "C"
         ARGH__K_POS,     /* const char *:  positional argument */
         ARGH__K_REST,    /* argh_values:   all remaining positionals */
         ARGH__K_GROUP,   /* help section heading */
-        ARGH__K_EXAMPLE  /* a command line for help, long_name holds it */
+        ARGH__K_EXAMPLE, /* a command line for help, long_name holds it */
+        ARGH__K_ENV      /* environment variable for target's option, long_name holds it */
     };
 
     /* Per-option flags. Stored in argh_opt.flags, combine with |. */
@@ -384,6 +385,10 @@ extern "C"
     /* A usage example for help, starting with the program name. Without
      * NDEBUG, argh_parse checks that it parses with the current options. */
     ARGH__DEF argh_opt *argh_example(argh_parser *p, const char *command, const char *help);
+    /* The option bound to target takes its value from environment variable
+     * name when the command line doesn't give one: command line, then
+     * environment, then the default. */
+    ARGH__DEF argh_opt *argh_env(argh_parser *p, void *target, const char *name);
 
     ARGH__DEF argh_opt *argh_required(argh_opt *opt);
     ARGH__DEF argh_opt *argh_optional(argh_opt *opt);
@@ -505,6 +510,9 @@ extern "C"
 #define ARGH_GROUP(title) {0, NULL, (unsigned char)ARGH__K_GROUP, 0, NULL, NULL, (title), NULL}
 /* A usage example shown in help; checked to parse in builds without NDEBUG */
 #define ARGH_EXAMPLE(command, help) {0, (command), (unsigned char)ARGH__K_EXAMPLE, 0, NULL, NULL, (help), NULL}
+/* The option bound to target takes its value from this environment variable
+ * when the command line doesn't give one */
+#define ARGH_ENV(target, name) {0, (name), (unsigned char)ARGH__K_ENV, 0, (void *)(target), NULL, NULL, NULL}
 #define ARGH_END {0, NULL, (unsigned char)ARGH__K_END, 0, NULL, NULL, NULL, NULL}
 
     /* ============================================================================
@@ -555,6 +563,19 @@ extern "C"
 #include <stdio.h>
 #endif
 #include <stdlib.h>
+
+/* Reads an environment variable for ARGH_ENV; NULL when it isn't set.
+ * Define it before the implementation to read settings from elsewhere or to
+ * fake the environment in tests. Firmware (ARGH_NO_STDIO) has no environment
+ * by default, which keeps getenv out of the image. */
+#ifndef ARGH_GETENV
+#ifdef ARGH_NO_STDIO
+/* No environment: ARGH_ENV entries are accepted and do nothing */
+#define ARGH__NO_ENV
+#else
+#define ARGH_GETENV(name) getenv(name)
+#endif
+#endif
 #include <string.h>
 
 #ifdef __cplusplus
@@ -1313,7 +1334,7 @@ extern "C"
     static bool argh__table_has_target(const argh_opt *o, const void *target)
     {
         for (; o && o->kind != ARGH__K_END; o++)
-            if (o->target == target && o->kind != ARGH__K_GROUP)
+            if (o->target == target && o->kind != ARGH__K_GROUP && o->kind != ARGH__K_ENV)
                 return true;
         return false;
     }
@@ -1424,6 +1445,46 @@ extern "C"
         if (p->argh__error.code != ARGH_E_CUSTOM)
             return argh__fail(p, ARGH_E_CUSTOM, -1, NULL, NULL, 0);
         return ARGH__S_ERROR;
+    }
+
+    /* Options the command line left out take their ARGH_ENV variable, if set.
+     * The value goes through the same checks as on the command line; an
+     * error has argv_index -1, which is how messages tell the source. A
+     * counter takes a number, a list one value. */
+    static int argh__apply_env(argh_parser *p)
+    {
+#ifdef ARGH__NO_ENV
+        (void)p;
+#else
+        ARGH__EACH(p, e, unused)
+        {
+            const argh_opt *o;
+            const char *v;
+            int index = 0;
+            (void)unused;
+            if (e->kind != ARGH__K_ENV)
+                continue;
+            o = argh__find_target(p, e->target, &index);
+            if (!o || !argh__is_option_kind(o->kind))
+                return argh__config_error(p, "ARGH_ENV names a variable that no option on this path is bound to", e);
+            if (argh__seen(p, index) || !(v = ARGH_GETENV(e->long_name)))
+                continue;
+            if (o->kind == ARGH__K_COUNT)
+            {
+                long n;
+                argh_err err = argh__parse_long(v, 0, INT_MAX, &n);
+                if (err != ARGH_E_NONE)
+                    return argh__fail(p, err, -1, o, v, 0);
+                if (ARGH__WRITING(p))
+                    *(int *)o->target = (int)n;
+                argh__mark(p, index);
+                continue;
+            }
+            if (argh__apply(p, o, index, v, false, -1, 0) != ARGH__S_OK)
+                return ARGH__S_ERROR;
+        }
+#endif
+        return ARGH__S_OK;
     }
 
     static int argh__check_required(argh_parser *p)
@@ -2070,6 +2131,11 @@ extern "C"
         return argh__add(p, 0, command, ARGH__K_EXAMPLE, NULL, NULL, help);
     }
 
+    ARGH__DEF argh_opt *argh_env(argh_parser *p, void *target, const char *name)
+    {
+        return argh__add(p, 0, name, ARGH__K_ENV, target, NULL, NULL);
+    }
+
     static argh_opt *argh__set_flag(argh_opt *opt, int flag)
     {
         if (opt)
@@ -2134,6 +2200,8 @@ extern "C"
         if (st == ARGH__S_OK)
             st = argh__assign_positionals(p, argv, positional_count);
         if (st == ARGH__S_OK)
+            st = argh__apply_env(p);
+        if (st == ARGH__S_OK)
             st = argh__check_required(p);
         if (st == ARGH__S_OK)
             st = p->argh__rule_check ? p->argh__rule_check(p) : ARGH__S_OK;
@@ -2180,7 +2248,7 @@ extern "C"
     {
         ARGH__EACH(p, o, i)
         {
-            if (o->target == target && o->kind != ARGH__K_GROUP)
+            if (o->target == target && o->kind != ARGH__K_GROUP && o->kind != ARGH__K_ENV)
             {
                 *index = i;
                 return o;
@@ -2231,6 +2299,36 @@ extern "C"
         return (c && c->run) ? c->run(p, user) : 0;
     }
 #endif
+
+    /* The ARGH_ENV variable of the option bound to target, or NULL. Always
+     * NULL without an environment, so help and errors don't mention one. */
+    static const char *argh__env_name(const argh_parser *p, const void *target)
+    {
+#ifdef ARGH__NO_ENV
+        (void)p;
+        (void)target;
+#else
+        ARGH__EACH(p, e, index)
+        {
+            (void)index;
+            if (e->kind == ARGH__K_ENV && e->target == target)
+                return e->long_name;
+        }
+#endif
+        return NULL;
+    }
+
+    /* " in NAME" when the value came from the environment, which is when the
+     * error has no argv position */
+    static void argh__sb_from_env(argh__sb *b, const argh_parser *p, const argh_error *e)
+    {
+        const char *name = e->argv_index < 0 && e->opt ? argh__env_name(p, e->opt->target) : NULL;
+        if (name)
+        {
+            argh__sb_put(b, " in ");
+            argh__sb_put(b, name);
+        }
+    }
 
     /* "--name" if the option has a long name, "-x" otherwise, "<name>" for
      * positionals. used_short: the short name the user typed, if any. */
@@ -2340,7 +2438,9 @@ extern "C"
         case ARGH_E_INVALID_VALUE:
             argh__sb_put(&b, "invalid value '");
             argh__sb_put(&b, e->value);
-            argh__sb_put(&b, "' for '");
+            argh__sb_char(&b, '\'');
+            argh__sb_from_env(&b, p, e);
+            argh__sb_put(&b, " for '");
             argh__sb_opt_name(&b, e->opt, e->short_name);
             argh__sb_put(&b, "': ");
             if (e->opt->kind == ARGH__K_CUSTOM && e->detail)
@@ -2351,7 +2451,9 @@ extern "C"
         case ARGH_E_OUT_OF_RANGE:
             argh__sb_put(&b, "value '");
             argh__sb_put(&b, e->value);
-            argh__sb_put(&b, "' for '");
+            argh__sb_char(&b, '\'');
+            argh__sb_from_env(&b, p, e);
+            argh__sb_put(&b, " for '");
             argh__sb_opt_name(&b, e->opt, e->short_name);
             argh__sb_put(&b, "' is out of range");
             break;
@@ -2384,6 +2486,15 @@ extern "C"
                                  : "missing required option '");
             argh__sb_opt_name(&b, e->opt, 0);
             argh__sb_char(&b, '\'');
+            {
+                const char *env = e->opt ? argh__env_name(p, e->opt->target) : NULL;
+                if (env)
+                {
+                    argh__sb_put(&b, " (or set ");
+                    argh__sb_put(&b, env);
+                    argh__sb_char(&b, ')');
+                }
+            }
             break;
         case ARGH_E_REPEATED:
             argh__sb_put(&b, "option '");
@@ -2724,7 +2835,21 @@ extern "C"
             argh__wrap(p, help, indent, &col, false);
         if (o)
         {
-            const char *d = argh__help_default(o, def, sizeof(def));
+            const char *env = argh__env_name(p, o->target);
+            const char *d;
+            if (env)
+            {
+                char tag[80];
+                argh__sb b;
+                b.buf = tag;
+                b.size = sizeof(tag);
+                b.len = 0;
+                argh__sb_put(&b, "[env: ");
+                argh__sb_put(&b, env);
+                argh__sb_char(&b, ']');
+                argh__wrap(p, tag, indent, &col, true);
+            }
+            d = argh__help_default(o, def, sizeof(def));
             if (d)
                 argh__wrap(p, d, indent, &col, true);
         }
@@ -2750,7 +2875,7 @@ extern "C"
         {
             size_t len;
             (void)index;
-            if (o->kind == ARGH__K_GROUP || o->kind == ARGH__K_EXAMPLE || (o->flags & ARGH_HIDDEN))
+            if (o->kind == ARGH__K_GROUP || o->kind == ARGH__K_EXAMPLE || o->kind == ARGH__K_ENV || (o->flags & ARGH_HIDDEN))
                 continue;
             if (slot < own_slot && !argh__is_option_kind(o->kind))
                 continue;

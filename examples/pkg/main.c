@@ -43,6 +43,7 @@ static const argh_opt global_opts[] = {
     ARGH_COUNT('v', "verbose", &opt.verbosity, "More output, repeat for more"),
     ARGH_STRING('C', NULL, &opt.dir, "Run as if started in this directory", 0, "<dir>"),
     ARGH_STRING(0, "registry", &opt.registry, "Package registry URL", 0, "<url>"),
+    ARGH_ENV(&opt.registry, "PKG_REGISTRY"),
     ARGH_FLAG(0, "offline", &opt.offline, "Use only the local cache"),
     ARGH_ENUM(0, "color", &opt.color, color_modes, "When to use colors"),
     /* Examples for `pkg --help`; commands have their own. Debug builds check

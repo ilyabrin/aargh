@@ -203,6 +203,52 @@ if (argh_given(&p, &jobs))
     printf("jobs set explicitly\n");
 ```
 
+### Environment variables
+
+Let an option fall back to an environment variable, the way tools take settings in containers and CI:
+
+<!-- docs-check: source=tests/docs/envtool.c -->
+```c
+argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
+argh_env(&p, &jobs, "TOOL_JOBS");
+argh_required(argh_string(&p, 0, "token", &token, "API token"));
+argh_env(&p, &token, "TOOL_TOKEN");      /* required, but the environment can give it */
+/* or in a table: ARGH_ENV(&jobs, "TOOL_JOBS") */
+```
+
+<!-- docs-check: program=envtool -->
+```console
+$ ./tool --help
+Usage: tool [OPTIONS]
+
+Options:
+  -j, --jobs <n>       Parallel jobs [env: TOOL_JOBS] (default: 4)
+      --token <value>  API token [env: TOOL_TOKEN] (required)
+
+  -h, --help           Print help
+
+$ TOOL_TOKEN=abc TOOL_JOBS=8 ./tool
+jobs=8 token=abc
+
+$ TOOL_TOKEN=abc TOOL_JOBS=8 ./tool -j 2
+jobs=2 token=abc
+
+$ TOOL_JOBS=lots ./tool --token abc
+tool: invalid value 'lots' in TOOL_JOBS for '--jobs': expected an integer
+Try 'tool --help' for more information.
+
+$ ./tool
+tool: missing required option '--token' (or set TOOL_TOKEN)
+Try 'tool --help' for more information.
+```
+
+- The command line wins, then the environment, then the default you initialized the variable with.
+- A value from the environment is checked like one on the command line. It counts as given: it satisfies a required option, `argh_given` reports it, and rules see it.
+- Flags take `1`/`0`, `true`/`false`, `yes`/`no`, `on`/`off`; a counter takes a number; a list takes one value.
+- Like rules, an environment entry refers to the variable, so a typo is a compile error. In a command's table it counts only when that command runs.
+- `ARGH_GETENV(name)` reads the variable, `getenv` by default. Define it before the implementation to read settings from somewhere else, or to fake the environment in tests. With `ARGH_NO_STDIO` (firmware) there is no environment unless you define it: the entries are accepted and do nothing, and help doesn't mention them.
+- Usage examples are command lines only: the environment does not take part in [checking them](#examples-in-help).
+
 ### Rules between options
 
 Some options only make sense together, or not at all together. Say so in a table that refers to your variables, and argh checks it and explains the problem:
@@ -554,19 +600,20 @@ argh is strict where other parsers guess:
 
 Define before including `argh.h`, the same way in every file that includes it. The simplest way is a compiler flag such as `-DARGH_BUILDER_CAP=8`, or one header of your own that sets them and includes `argh.h`:
 
-| Macro              | Default | Meaning                                                                        |
-| ------------------ | ------: | ------------------------------------------------------------------------------ |
-| `ARGH_BUILDER_CAP` |      32 | Options that builder calls can add. `0` if you only use tables                 |
-| `ARGH_MAX_OPTS`    |      64 | Options on the active command path, all tables combined                        |
-| `ARGH_MAX_TABLES`  |       8 | Tables per parser. The builder counts as one                                   |
-| `ARGH_HELP_WIDTH`  |      80 | Column where help text wraps. `0` turns wrapping off                           |
-| `ARGH_MAX_DEPTH`   |       4 | Levels of nested commands                                                      |
-| `ARGH_NO_SUGGEST`  |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
-| `ARGH_NO_COMMANDS` |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
-| `ARGH_NO_STDIO`    |         | Define to build without `<stdio.h>`, see [Microcontrollers](#microcontrollers) |
-| `ARGH_NO_FLOAT`    |         | Define to remove `argh_double` and floating point (27 KB on newlib firmware)   |
-| `ARGH_STATIC`      |         | Define to include the implementation with every function `static`              |
-| `NDEBUG`           |         | The usual release flag: skips the slower checks of your definitions            |
+| Macro               | Default | Meaning                                                                        |
+| ------------------- | ------: | ------------------------------------------------------------------------------ |
+| `ARGH_BUILDER_CAP`  |      32 | Options that builder calls can add. `0` if you only use tables                 |
+| `ARGH_MAX_OPTS`     |      64 | Options on the active command path, all tables combined                        |
+| `ARGH_MAX_TABLES`   |       8 | Tables per parser. The builder counts as one                                   |
+| `ARGH_HELP_WIDTH`   |      80 | Column where help text wraps. `0` turns wrapping off                           |
+| `ARGH_MAX_DEPTH`    |       4 | Levels of nested commands                                                      |
+| `ARGH_NO_SUGGEST`   |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
+| `ARGH_NO_COMMANDS`  |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
+| `ARGH_NO_STDIO`     |         | Define to build without `<stdio.h>`, see [Microcontrollers](#microcontrollers) |
+| `ARGH_NO_FLOAT`     |         | Define to remove `argh_double` and floating point (27 KB on newlib firmware)   |
+| `ARGH_STATIC`       |         | Define to include the implementation with every function `static`              |
+| `ARGH_GETENV(name)` |         | How `ARGH_ENV` reads a variable: `getenv`, or none with `ARGH_NO_STDIO`        |
+| `NDEBUG`            |         | The usual release flag: skips the slower checks of your definitions            |
 
 Sizes are for Linux GCC. The four size settings and `ARGH_NO_COMMANDS` change the size of `argh_parser`, so files built with different values would corrupt memory. argh.h catches that at build time: they fail to link, with a name like `argh_init_settings_b8_o64_t8_d4_cmd` in the error. Define the size settings as plain numbers.
 
@@ -605,6 +652,7 @@ argh_opt *argh_rest  (argh_parser *p, const char *name, argh_values *target, con
 argh_opt *argh_custom(argh_parser *p, char s, const char *l, void *target, const argh_type *type, const char *help);
 argh_opt *argh_group (argh_parser *p, const char *title);
 argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  /* checked without NDEBUG */
+argh_opt *argh_env    (argh_parser *p, void *target, const char *name);          /* fallback for target's option */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -638,6 +686,7 @@ ARGH_DOUBLE(s, l, &double_var, help, ...)    ARGH_REST(name, &values_var, help, 
 ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
 ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
+ARGH_ENV(&var, name)                         /* environment variable for var's option */
 
 /* Commands, in a table ending with ARGH_CMD_END (commands) */
 ARGH_CMD(name, help, options[, handler[, flags]])   /* flags: ARGH_POSIX */

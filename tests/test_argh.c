@@ -6,6 +6,12 @@
  * collects it so help and error text can be compared exactly.
  */
 
+/* A fake environment for ARGH_ENV tests: set_env("NAME", "value") */
+static const char *fake_env_names[4];
+static const char *fake_env_values[4];
+static const char *fake_getenv(const char *name);
+#define ARGH_GETENV(name) fake_getenv(name)
+
 #define ARGH_IMPLEMENTATION
 #include "../argh.h"
 
@@ -67,8 +73,30 @@ static size_t out_len;
 static char err_text[2048];
 static size_t err_len;
 
+static const char *fake_getenv(const char *name)
+{
+    int i;
+    for (i = 0; i < 4; i++)
+        if (fake_env_names[i] && strcmp(fake_env_names[i], name) == 0)
+            return fake_env_values[i];
+    return NULL;
+}
+
+static void set_env(const char *name, const char *value)
+{
+    int i;
+    for (i = 0; i < 4 && fake_env_names[i]; i++)
+        ;
+    if (i < 4)
+    {
+        fake_env_names[i] = name;
+        fake_env_values[i] = value;
+    }
+}
+
 static void reset_output(void)
 {
+    memset(fake_env_names, 0, sizeof(fake_env_names));
     out_len = err_len = 0;
     out_text[0] = err_text[0] = '\0';
 }
@@ -2163,6 +2191,231 @@ TEST(test_suggest_on_command_path)
 #endif /* ARGH_NO_SUGGEST */
 
 /* ============================================================================
+ * Environment variables
+ * ============================================================================ */
+
+static int en_jobs;
+static bool en_verbose;
+static int en_count;
+static const char *en_out;
+static const char *en_inc_buf[2];
+static argh_values en_inc;
+
+static const argh_opt en_opts[] = {
+    ARGH_INT('j', "jobs", &en_jobs, "Parallel jobs"),
+    ARGH_FLAG(0, "verbose", &en_verbose, "Verbose output"),
+    ARGH_COUNT('d', "debug", &en_count, "More debug output"),
+    ARGH_LIST('I', "include", &en_inc, "Include dir"),
+    ARGH_ENV(&en_jobs, "TOOL_JOBS"),
+    ARGH_ENV(&en_verbose, "TOOL_VERBOSE"),
+    ARGH_ENV(&en_count, "TOOL_DEBUG"),
+    ARGH_ENV(&en_inc, "TOOL_INCLUDE"),
+    ARGH_END,
+};
+
+static void setup_env(argh_parser *p)
+{
+    en_jobs = 4;
+    en_verbose = false;
+    en_count = 0;
+    en_out = NULL;
+    en_inc.items = en_inc_buf;
+    en_inc.count = 0;
+    en_inc.capacity = 2;
+    setup(p);
+    argh_table(p, en_opts);
+}
+
+TEST(test_env_fills_missing_options)
+{
+    ARGV0();
+    argh_parser p;
+    setup_env(&p);
+    set_env("TOOL_JOBS", "8");
+    set_env("TOOL_VERBOSE", "yes");
+    set_env("TOOL_DEBUG", "3");
+    set_env("TOOL_INCLUDE", "/opt/inc");
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(en_jobs, 8);
+    ASSERT_TRUE(en_verbose);
+    ASSERT_EQ(en_count, 3);
+    ASSERT_EQ(en_inc.count, 1);
+    ASSERT_STR_EQ(en_inc.items[0], "/opt/inc");
+    ASSERT_TRUE(argh_given(&p, &en_jobs));
+}
+
+TEST(test_env_command_line_wins)
+{
+    ARGV("-j", "2", "-dd");
+    argh_parser p;
+    setup_env(&p);
+    set_env("TOOL_JOBS", "8");
+    set_env("TOOL_DEBUG", "5");
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(en_jobs, 2);
+    ASSERT_EQ(en_count, 2);
+}
+
+TEST(test_env_unset_keeps_default)
+{
+    ARGV0();
+    argh_parser p;
+    setup_env(&p);
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(en_jobs, 4);
+    ASSERT_FALSE(argh_given(&p, &en_jobs));
+}
+
+TEST(test_env_value_is_checked)
+{
+    ARGV0();
+    argh_parser p;
+    setup_env(&p);
+    set_env("TOOL_JOBS", "many");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_exit_code(&p), 2);
+    ASSERT_STR_EQ(error_text(&p), "invalid value 'many' in TOOL_JOBS for '--jobs': expected an integer");
+    ASSERT_EQ(en_jobs, 4);
+}
+
+TEST(test_env_value_out_of_range)
+{
+    ARGV0();
+    argh_parser p;
+    setup_env(&p);
+    set_env("TOOL_DEBUG", "-1");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "value '-1' in TOOL_DEBUG for '--debug' is out of range");
+}
+
+TEST(test_env_in_help)
+{
+    ARGV("--help");
+    argh_parser p;
+    setup_env(&p);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "Parallel jobs [env: TOOL_JOBS] (default: 4)\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "TOOL_JOBS\n") == NULL);
+}
+
+TEST(test_env_satisfies_required)
+{
+    ARGV0();
+    const char *token = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_required(argh_string(&p, 0, "token", &token, "API token"));
+    argh_env(&p, &token, "TOOL_TOKEN");
+    set_env("TOOL_TOKEN", "s3cret");
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(token, "s3cret");
+}
+
+TEST(test_env_named_when_required_is_missing)
+{
+    ARGV0();
+    const char *token = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_required(argh_string(&p, 0, "token", &token, "API token"));
+    argh_env(&p, &token, "TOOL_TOKEN");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "missing required option '--token' (or set TOOL_TOKEN)");
+}
+
+static bool en_json, en_yaml;
+static const argh_rule en_rules[] = {ARGH_AT_MOST_ONE(&en_json, &en_yaml), ARGH_RULES_END};
+
+TEST(test_env_counts_for_rules)
+{
+    ARGV("--yaml");
+    argh_parser p;
+    en_json = en_yaml = false;
+    setup(&p);
+    argh_flag(&p, 0, "json", &en_json, "JSON");
+    argh_flag(&p, 0, "yaml", &en_yaml, "YAML");
+    argh_env(&p, &en_json, "TOOL_JSON");
+    argh_rules(&p, en_rules);
+    set_env("TOOL_JSON", "1");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "options '--json' and '--yaml' cannot be used together");
+}
+
+TEST(test_env_needs_an_option)
+{
+    ARGV0();
+    int orphan = 0;
+    argh_parser p;
+    setup(&p);
+    argh_env(&p, &orphan, "TOOL_ORPHAN");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_CONFIG);
+}
+
+#ifndef ARGH_NO_COMMANDS
+static int en_port;
+static const argh_opt en_serve_opts[] = {
+    ARGH_INT('p', "port", &en_port, "Port"),
+    ARGH_ENV(&en_port, "TOOL_PORT"),
+    ARGH_END,
+};
+static const argh_cmd en_cmds[] = {
+    ARGH_CMD("serve", "Serve", en_serve_opts),
+    ARGH_CMD("check", "Check", NULL),
+    ARGH_CMD_END,
+};
+
+/* A command's variables count only when that command runs */
+TEST(test_env_per_command)
+{
+    char *serve[] = {(char *)"tool", (char *)"serve", NULL};
+    char *check[] = {(char *)"tool", (char *)"check", NULL};
+    argh_parser p;
+
+    en_port = 80;
+    argh_init(&p, "tool", NULL);
+    argh_set_writer(&p, capture, NULL);
+    argh_commands(&p, en_cmds);
+    set_env("TOOL_PORT", "8080");
+    ASSERT_TRUE(argh_parse(&p, 2, serve));
+    ASSERT_EQ(en_port, 8080);
+
+    en_port = 80;
+    argh_init(&p, "tool", NULL);
+    argh_set_writer(&p, capture, NULL);
+    argh_commands(&p, en_cmds);
+    ASSERT_TRUE(argh_parse(&p, 2, check));
+    ASSERT_EQ(en_port, 80);
+}
+#endif
+
+#ifndef NDEBUG
+/* Examples are command lines only: the environment does not reach them */
+TEST(test_env_not_used_by_examples)
+{
+    ARGV0();
+    argh_parser p;
+    setup_env(&p);
+    argh_example(&p, "prog -j 2", NULL);
+    set_env("TOOL_JOBS", "not a number");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    /* The real parse reads it and fails; the example check did not */
+    ASSERT_STR_EQ(error_text(&p), "invalid value 'not a number' in TOOL_JOBS for '--jobs': expected an integer");
+}
+#endif
+
+/* ============================================================================
  * Wrapping long help text
  * ============================================================================ */
 
@@ -2740,6 +2993,22 @@ int main(void)
 #endif
 #if !defined(ARGH_NO_SUGGEST) && !defined(ARGH_NO_COMMANDS)
     RUN_TEST(test_suggest_on_command_path);
+#endif
+    RUN_TEST(test_env_fills_missing_options);
+    RUN_TEST(test_env_command_line_wins);
+    RUN_TEST(test_env_unset_keeps_default);
+    RUN_TEST(test_env_value_is_checked);
+    RUN_TEST(test_env_value_out_of_range);
+    RUN_TEST(test_env_in_help);
+    RUN_TEST(test_env_satisfies_required);
+    RUN_TEST(test_env_named_when_required_is_missing);
+    RUN_TEST(test_env_counts_for_rules);
+    RUN_TEST(test_env_needs_an_option);
+#ifndef ARGH_NO_COMMANDS
+    RUN_TEST(test_env_per_command);
+#endif
+#ifndef NDEBUG
+    RUN_TEST(test_env_not_used_by_examples);
 #endif
 #if ARGH_HELP_WIDTH == 80
     RUN_TEST(test_help_wraps_at_80);
