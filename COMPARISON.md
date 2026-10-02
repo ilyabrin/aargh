@@ -2,7 +2,7 @@
 
 How argh.h compares with three parsers C programs often use: `getopt_long` (the C library's), [cargs](https://github.com/likle/cargs) v1.2.0 and [argparse](https://github.com/cofyc/argparse) v1.1.0. The three libraries are MIT-licensed and make no heap allocations; `getopt_long` is part of the C library on Linux and BSD.
 
-The short version: argh does the most work for you (typed values that are fully checked, help, errors with suggestions, commands, rules) and is the strictest about input. It pays for that in code size and is a little slower. cargs and argparse are smaller and faster, and leave more to your program.
+The short version: argh does the most work for you (typed values that are fully checked, help, errors with suggestions, commands, rules) and is the strictest about input. It pays for that in code size; in speed it is ahead of getopt_long, on par with cargs and close to argparse. cargs and argparse are much smaller, and leave more to your program.
 
 Everything below was measured or tried, not taken from documentation. Reproduce it with [bench/compare/compare.sh](bench/compare/compare.sh), which fetches cargs and argparse at the versions above.
 
@@ -52,12 +52,12 @@ Intel Core i5-12400F, Ubuntu 24.04 on WSL 2, `-O2 -DNDEBUG`, median of three run
 
 | Parser       | GCC 13.3 | Clang 18.1 |
 | ------------ | -------: | ---------: |
-| argh (table) |   543 ns |     502 ns |
-| getopt_long  |   498 ns |     504 ns |
-| cargs        |   469 ns |     426 ns |
-| argparse     |   420 ns |     370 ns |
+| argh (table) |   444 ns |     426 ns |
+| getopt_long  |   492 ns |     497 ns |
+| cargs        |   457 ns |     421 ns |
+| argparse     |   419 ns |     371 ns |
 
-argh is 9% slower than `getopt_long` with GCC and about even with Clang; cargs is 6% to 15% faster than getopt, argparse 16% to 27%. In absolute terms the difference is about 0.1 µs, once, at program start. argparse also checks the least of the four.
+argh is 10% to 14% faster than `getopt_long`, on par with cargs, and 6% to 15% slower than argparse, which also checks the least of the four. In absolute terms all four are within 0.13 µs of each other, once, at program start.
 
 ## Code size
 
@@ -65,8 +65,8 @@ argh is 9% slower than `getopt_long` with GCC and about even with Clang; cargs i
 
 | Parser                                             | GCC 13.3 | Clang 18.1 |
 | -------------------------------------------------- | -------: | ---------: |
-| argh                                               |  17.6 KB |    21.4 KB |
-| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`)          |  13.9 KB |    16.0 KB |
+| argh                                               |  17.7 KB |    21.4 KB |
+| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`)          |  14.0 KB |    16.0 KB |
 | cargs                                              |   3.2 KB |     3.2 KB |
 | argparse                                           |   4.4 KB |     4.1 KB |
 | getopt_long                                        |   0.6 KB |     0.5 KB |
@@ -75,8 +75,8 @@ On a Cortex-M0 (newlib-nano, the same program printing with `printf`):
 
 | Parser                    | Flash added |
 | ------------------------- | ----------: |
-| argh                      |     31.6 KB |
-| argh with `ARGH_NO_FLOAT` |      9.9 KB |
+| argh                      |     31.7 KB |
+| argh with `ARGH_NO_FLOAT` |     10.0 KB |
 | cargs                     |      1.7 KB |
 | argparse                  |     22.6 KB |
 
