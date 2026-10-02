@@ -142,7 +142,8 @@ extern "C"
         ARGH__K_REST,    /* argh_values:   all remaining positionals */
         ARGH__K_GROUP,   /* help section heading */
         ARGH__K_EXAMPLE, /* a command line for help, long_name holds it */
-        ARGH__K_ENV      /* environment variable for target's option, long_name holds it */
+        ARGH__K_ENV,     /* environment variable for target's option, long_name holds it */
+        ARGH__K_IMPLICIT /* value of target's option when given bare, long_name holds it */
     };
 
     /* Per-option flags. Stored in argh_opt.flags, combine with |. */
@@ -393,6 +394,7 @@ extern "C"
      * name when the command line doesn't give one: command line, then
      * environment, then the default. */
     ARGH__DEF argh_opt *argh_env(argh_parser *p, void *target, const char *name);
+    ARGH__DEF argh_opt *argh_implicit(argh_parser *p, void *target, const char *value);
 
     ARGH__DEF argh_opt *argh_required(argh_opt *opt);
     ARGH__DEF argh_opt *argh_optional(argh_opt *opt);
@@ -519,6 +521,9 @@ extern "C"
 /* The option bound to target takes its value from this environment variable
  * when the command line doesn't give one */
 #define ARGH_ENV(target, name) {0, (name), (unsigned char)ARGH__K_ENV, 0, (void *)(target), NULL, NULL, NULL}
+/* Right after an option: makes its value optional. --name alone (or -n)
+ * stands for --name=value; another value then needs '=': --name=other. */
+#define ARGH_IMPLICIT(target, value) {0, (value), (unsigned char)ARGH__K_IMPLICIT, 0, (void *)(target), NULL, NULL, NULL}
 #define ARGH_END {0, NULL, (unsigned char)ARGH__K_END, 0, NULL, NULL, NULL, NULL}
 
     /* ============================================================================
@@ -1123,6 +1128,15 @@ extern "C"
     /* Option bound to target on the active path, and its "seen" index */
     static const argh_opt *argh__find_target(const argh_parser *p, const void *target, int *index);
 
+    /* The ARGH_IMPLICIT value of a value option, or NULL. The entry follows
+     * its option directly, so this costs one look on every parse. Every
+     * option has an entry after it: at least ARGH_END. */
+    static const char *argh__implicit(const argh_opt *o)
+    {
+        return (argh__takes_value(o) && o[1].kind == ARGH__K_IMPLICIT && o[1].target == o->target) ? o[1].long_name
+                                                                                                    : NULL;
+    }
+
     static int argh__apply(argh_parser *p, const argh_opt *o, int index, const char *v,
                            bool negated, int argi, char short_name)
     {
@@ -1271,6 +1285,8 @@ extern "C"
                 {
                     if (eq)
                         v = eq + 1;
+                    else if ((v = argh__implicit(o)) != NULL)
+                        ; /* --color alone; the next argument is not its value */
                     else if (argh__next_is_value(i, argc, argv))
                         v = argv[++i];
                     else
@@ -1313,7 +1329,7 @@ extern "C"
                         rc = argh__fail(p, ARGH_E_UNKNOWN_OPTION, argi, NULL, arg, *c);
                         break;
                     }
-                    if (argh__takes_value(o))
+                    if (argh__takes_value(o) && !argh__implicit(o))
                     {
                         const char *v = NULL;
                         if (c[1] == '=')
@@ -1328,8 +1344,9 @@ extern "C"
                             rc = argh__apply(p, o, index, v, false, argi, *c);
                         break; /* the rest of the cluster was the value */
                     }
+                    /* A flag, a counter, or a value option used bare like -c */
                     if (apply)
-                        rc = argh__apply(p, o, index, NULL, false, argi, *c);
+                        rc = argh__apply(p, o, index, argh__implicit(o), false, argi, *c);
                 }
             }
 
@@ -1388,7 +1405,7 @@ extern "C"
     static bool argh__table_has_target(const argh_opt *o, const void *target)
     {
         for (; o && o->kind != ARGH__K_END; o++)
-            if (o->target == target && o->kind != ARGH__K_GROUP && o->kind != ARGH__K_ENV)
+            if (o->target == target && o->kind < ARGH__K_GROUP) /* options and positionals */
                 return true;
         return false;
     }
@@ -1842,6 +1859,20 @@ extern "C"
     /* Parses one example like a real command line, writing to no variable.
      * buf belongs to argh_parse, so an error can still point into it while
      * the message is printed. --help or --version in an example is fine. */
+    /* ARGH_IMPLICIT: directly after its option, which takes a value, has a
+     * long name (so a value can still be given with '='), and accepts it */
+    static int argh__check_implicit(argh_parser *p, const argh_opt *table, const argh_opt *e)
+    {
+        const char *reason = NULL;
+        const argh_opt *o = e - 1;
+        if (e == table || !argh__is_option_kind(o->kind) || !argh__implicit(o) || !o->long_name)
+            return argh__config_error(p, "ARGH_IMPLICIT must directly follow a value option with a long name, bound to the same variable",
+                                      e == table ? NULL : o);
+        if (!e->long_name || argh__store(o, e->long_name, false, &reason, false) != ARGH_E_NONE)
+            return argh__config_error(p, "ARGH_IMPLICIT value is not valid for its option", o);
+        return ARGH__S_OK;
+    }
+
     static int argh__check_example(argh_parser *p, const argh_opt *ex, char *buf)
     {
         char *words[ARGH__EXAMPLE_WORDS + 1];
@@ -1869,6 +1900,7 @@ extern "C"
 
     static int argh__check_examples_in(argh_parser *p, const argh_opt *t, char *buf, const argh_opt **bad)
     {
+        const argh_opt *table = t;
         for (; t && t->kind != ARGH__K_END; t++)
         {
             if (t->kind == ARGH__K_EXAMPLE && argh__check_example(p, t, buf) != ARGH__S_OK)
@@ -1876,6 +1908,8 @@ extern "C"
                 *bad = t;
                 return ARGH__S_ERROR;
             }
+            if (t->kind == ARGH__K_IMPLICIT && argh__check_implicit(p, table, t) != ARGH__S_OK)
+                return ARGH__S_ERROR;
         }
         return ARGH__S_OK;
     }
@@ -2200,6 +2234,11 @@ extern "C"
         return argh__add(p, 0, name, ARGH__K_ENV, target, NULL, NULL);
     }
 
+    ARGH__DEF argh_opt *argh_implicit(argh_parser *p, void *target, const char *value)
+    {
+        return argh__add(p, 0, value, ARGH__K_IMPLICIT, target, NULL, NULL);
+    }
+
     static argh_opt *argh__set_flag(argh_opt *opt, int flag)
     {
         if (opt)
@@ -2312,7 +2351,7 @@ extern "C"
     {
         ARGH__EACH(p, o, i)
         {
-            if (o->target == target && o->kind != ARGH__K_GROUP && o->kind != ARGH__K_ENV)
+            if (o->target == target && o->kind < ARGH__K_GROUP) /* options and positionals */
             {
                 *index = i;
                 return o;
@@ -2745,8 +2784,12 @@ extern "C"
         }
         if (argh__takes_value(o))
         {
-            argh__sb_char(&b, ' ');
+            /* -c, --color[=<when>]: the value is optional */
+            bool bare = argh__implicit(o) != NULL;
+            argh__sb_put(&b, bare ? "[=" : " ");
             argh__sb_metavar(&b, o);
+            if (bare)
+                argh__sb_char(&b, ']');
         }
         return b.len;
     }
@@ -2951,7 +2994,7 @@ extern "C"
         {
             size_t len;
             (void)index;
-            if (o->kind == ARGH__K_GROUP || o->kind == ARGH__K_EXAMPLE || o->kind == ARGH__K_ENV || (o->flags & ARGH_HIDDEN))
+            if (o->kind >= ARGH__K_GROUP || (o->flags & ARGH_HIDDEN))
                 continue;
             if (slot < own_slot && !argh__is_option_kind(o->kind))
                 continue;

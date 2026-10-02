@@ -42,6 +42,7 @@ PROGRAMS = {
     'guide': (['tests/docs/guide.c'], []),
     'mcu': (['tests/docs/mcu.c'], []),
     'envtool': (['tests/docs/envtool.c'], []),
+    'colortool': (['tests/docs/colortool.c'], []),
     'wc': (['examples/wc.c'], []),
     'logship': (['examples/logship.c'], []),
     'pkg': (['examples/pkg/main.c', 'examples/pkg/install.c', 'examples/pkg/remote.c', 'examples/pkg/exec.c'], []),

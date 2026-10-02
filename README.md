@@ -205,6 +205,47 @@ if (argh_given(&p, &jobs))
     printf("jobs set explicitly\n");
 ```
 
+### Optional values
+
+Some options work alone and also take a value, like `--color` and `--color=never`. Put `argh_implicit` right after the option, with the value that the option alone stands for:
+
+<!-- docs-check: source=tests/docs/colortool.c -->
+```c
+argh_metavar(argh_enum(&p, 0, "color", &color, when, "Colorize: never, auto or always"), "<when>");
+argh_implicit(&p, &color, "always");   /* --color alone means --color=always */
+/* or in a table, right after the option: ARGH_IMPLICIT(&color, "always") */
+```
+
+<!-- docs-check: program=colortool -->
+```console
+$ ./tool --help
+Usage: tool [OPTIONS] [files...]
+
+Arguments:
+  [files...]            Files to show
+
+Options:
+      --color[=<when>]  Colorize: never, auto or always (default: auto)
+
+  -h, --help            Print help
+
+$ ./tool --color
+color=always files=0
+
+$ ./tool --color=never
+color=never files=0
+
+$ ./tool --color a.txt
+color=always files=1
+
+$ ./tool
+color=auto files=0
+```
+
+- **A value needs `=`.** In `--color a.txt`, `a.txt` is a file, not the value: otherwise adding a value to an option would change what the arguments after it mean. A short name (`-c`) works only alone, like a flag, and can be combined: `-cv`.
+- The option needs a long name, so that a value can still be given. Without `NDEBUG` argh checks this, that the entry comes right after its option, and that the option accepts the value.
+- `--color` alone counts as given for `argh_given`, required options and rules. A value from the environment is an ordinary value.
+
 ### Environment variables
 
 Let an option fall back to an environment variable, the way tools take settings in containers and CI:
@@ -657,6 +698,7 @@ argh_opt *argh_custom(argh_parser *p, char s, const char *l, void *target, const
 argh_opt *argh_group (argh_parser *p, const char *title);
 argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  /* checked without NDEBUG */
 argh_opt *argh_env    (argh_parser *p, void *target, const char *name);          /* fallback for target's option */
+argh_opt *argh_implicit(argh_parser *p, void *target, const char *value);      /* right after it: value optional */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -692,6 +734,7 @@ ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
 ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
 ARGH_ENV(&var, name)                         /* environment variable for var's option */
+ARGH_IMPLICIT(&var, value)                   /* right after var's option: --name alone means --name=value */
 
 /* Commands, in a table ending with ARGH_CMD_END (commands) */
 ARGH_CMD(name, help, options[, handler[, flags]])   /* flags: ARGH_POSIX */

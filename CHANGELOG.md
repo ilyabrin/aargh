@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Optional values: `argh_implicit(&p, &color, "always")` or `ARGH_IMPLICIT(&color, "always")` right after an option. `--color` alone means `--color=always`; a value needs `=` (`--color=never`), so in `--color a.txt` the file stays a positional. A short name works alone, like a flag (`-cv`). Help shows `--color[=<when>]`. Without `NDEBUG` argh checks that the entry follows a value option with a long name and that the option accepts the value. Costs about 120 bytes on firmware and nothing in parse time.
+
 ## [1.4.0] - 2026-10-03
 
 ### Added
