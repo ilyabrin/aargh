@@ -47,6 +47,8 @@ check 0 "timeout 30s (default)"            $LOGSHIP --to x:1 -vv LICENSE
 check 0 "Would stream standard input"      $LOGSHIP --to x:1 --stdin
 check 0 "(default: 64M)"                   $LOGSHIP --help
 check 2 "missing required option '--to'"   $LOGSHIP LICENSE
+check 0 "to logs.example.com:6514"         env LOGSHIP_TO=logs.example.com:6514 $LOGSHIP LICENSE
+check 2 "in LOGSHIP_TO for '--to'"         env LOGSHIP_TO=x:0 $LOGSHIP LICENSE
 check 2 "port must be a number"            $LOGSHIP --to x:99999 LICENSE
 check 2 "expected a duration"              $LOGSHIP --to x:1 --timeout 5x LICENSE
 check 2 "'--gzip' and '--zstd' cannot"     $LOGSHIP --to x:1 --gzip --zstd LICENSE

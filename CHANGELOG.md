@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Environment variables: `argh_env(&p, &jobs, "TOOL_JOBS")` or `ARGH_ENV(&jobs, "TOOL_JOBS")` in a table. When the command line doesn't set the option, its value comes from the variable, checked like a command-line value; it counts as given for required options, `argh_given` and rules. Help shows `[env: TOOL_JOBS]`, errors name the variable (`invalid value 'x' in TOOL_JOBS for '--jobs'`), and a missing required option says `(or set TOOL_TOKEN)`.
+- `ARGH_GETENV(name)` decides how variables are read: `getenv` by default; redefine it to read from elsewhere or to fake the environment in tests. With `ARGH_NO_STDIO` there is no environment unless it is defined, so firmware doesn't pull in `getenv`.
+- The logship and pkg examples take `LOGSHIP_TO` and `PKG_REGISTRY`.
+- Cost: about 1 KB of code on a desktop (Linux GCC, release), whether or not a program uses it; about 12 bytes on firmware, which has no environment.
+
 ## [1.2.0] - 2026-10-02
 
 ### Added

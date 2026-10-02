@@ -134,6 +134,10 @@ return argh_run(&p, NULL);   /* calls the selected command's handler; or switch 
 
 Add usage examples with `argh_example(&p, "tool -j 8 data.csv", "What it does")` or `ARGH_EXAMPLE(...)` in any table, including a command's table (then it shows in that command's help). Write the program name first; quotes group words. In builds without `NDEBUG`, `argh_parse` parses every example against the current definitions without writing variables, and fails with `ARGH_E_CONFIG` and a message naming the example if one doesn't work. So when you rename or change an option, update the examples too, and run the program once in a debug build to confirm. Custom-type values, list capacity and the validator are not checked.
 
+## Environment variables
+
+`argh_env(&p, &jobs, "TOOL_JOBS")` or `ARGH_ENV(&jobs, "TOOL_JOBS")` in a table: when the command line doesn't set the option, its value comes from that variable, checked like a command-line value. Order: command line, environment, default. A value from the environment satisfies a required option and counts for `argh_given` and rules. Help shows `[env: TOOL_JOBS]`; errors say `in TOOL_JOBS`. `ARGH_GETENV(name)` (default `getenv`) can be redefined, for example to fake the environment in tests; with `ARGH_NO_STDIO` there is no environment unless it is defined.
+
 ## Rules and validation
 
 ```c

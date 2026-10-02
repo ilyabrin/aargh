@@ -76,8 +76,9 @@ Internal names start with `argh__` / `ARGH__`; everything public starts with `ar
    - `argh__apply` converts the value into the variable (`argh__store`) and marks the option as seen. A conversion error records which option and value failed.
 5. **Check the command path**: options on the path fit `ARGH_MAX_OPTS`, a command group got its subcommand, and (debug) no duplicate names.
 6. **Assign positionals**: `ARGH_POS` entries take the moved arguments in order; `ARGH_REST` points into `argv` at the remainder, with no copy.
-7. **Required options**, then **rules**, then your **validator**, in that order, so the validator can rely on everything else being valid.
-8. **On an error**, compute a suggestion (only now, so a successful parse never pays for it) and print the message and the hint to stderr. On help or version, print them to stdout. Return `false`; `argh_exit_code` gives 2 for errors and 0 otherwise.
+7. **Environment**: options the command line left out take their `ARGH_ENV` variable, through the same conversion as on the command line, and count as seen. Such an error has no `argv` position, which is how its message knows to name the variable.
+8. **Required options**, then **rules**, then your **validator**, in that order, so the validator can rely on everything else being valid.
+9. **On an error**, compute a suggestion (only now, so a successful parse never pays for it) and print the message and the hint to stderr. On help or version, print them to stdout. Return `false`; `argh_exit_code` gives 2 for errors and 0 otherwise.
 
 ## Techniques worth knowing
 
@@ -141,6 +142,7 @@ The decisions that shaped the library, with the reason that settled each one.
 | `ARGH_NO_FLOAT` exists | Measuring a real firmware link showed `strtod` pulling in 27 KB, printf included, out of 38 KB. |
 | Examples in help are checked by parsing them | Documentation that compiles but lies is worse than none; a renamed option should break the build of the docs, not the user's copy-paste. |
 | Examples live in option tables, not in a parser field | Keeps the parser state at 248 bytes and gives commands their own examples for free. |
+| Environment variables are table entries bound to a variable | Same reasons as examples, plus a typo in the variable is a compile error, like in rules. Firmware has no environment by default, so `getenv` and the code around it stay out of the image. |
 
 The full design notes, including alternatives that were rejected, are kept by the maintainer and summarized here.
 

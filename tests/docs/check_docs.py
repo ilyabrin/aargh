@@ -41,6 +41,7 @@ PROGRAMS = {
     'convert_broken': (['tests/docs/convert.c'], ['-DBROKEN']),
     'guide': (['tests/docs/guide.c'], []),
     'mcu': (['tests/docs/mcu.c'], []),
+    'envtool': (['tests/docs/envtool.c'], []),
     'wc': (['examples/wc.c'], []),
     'logship': (['examples/logship.c'], []),
     'pkg': (['examples/pkg/main.c', 'examples/pkg/install.c', 'examples/pkg/remote.c', 'examples/pkg/exec.c'], []),
@@ -120,8 +121,10 @@ def check_code(path, text):
     return count
 
 
-def run(exe, args, cwd=ROOT):
-    r = subprocess.run([exe] + args, cwd=cwd, capture_output=True, text=True)
+def run(exe, args, cwd=ROOT, env=None):
+    full_env = dict(os.environ)
+    full_env.update(env or {})
+    r = subprocess.run([exe] + args, cwd=cwd, capture_output=True, text=True, env=full_env)
     return r.returncode, (r.stdout + r.stderr).replace('\r\n', '\n').rstrip('\n')
 
 
@@ -160,13 +163,18 @@ def check_console(path, text, binaries, mapping=None, cwd=ROOT):
                     fail('%s:%d: "echo $?" shows %s, the exit code was %s' % (path, at, expected, last_rc))
                 continue
             argv = shlex.split(cmd)
+            # "NAME=value ./prog" sets an environment variable, as in sh
+            env = {}
+            while argv and re.fullmatch(r'[A-Z_][A-Z0-9_]*=.*', argv[0]):
+                key, _, value = argv.pop(0).partition('=')
+                env[key] = value
             name = program if program else mapping.get(argv[0])
             if not name:
                 continue
             if name not in binaries:
                 fail('%s:%d: %s was not built' % (path, at, name))
                 continue
-            last_rc, got = run(binaries[name], argv[1:], cwd)
+            last_rc, got = run(binaries[name], argv[1:], cwd, env)
             count += 1
             if got != expected:
                 fail('%s:%d: output of "%s" differs\n--- documented\n%s\n--- real\n%s' % (path, at, cmd, expected, got))

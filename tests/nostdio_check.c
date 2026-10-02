@@ -59,11 +59,14 @@ int main(void)
     argh_init(&p, "fw", "Firmware shell");
     argh_set_writer(&p, to_buffer, NULL);
     argh_long(&p, 'r', "rate", &rate, "Baud rate");
+    /* Firmware has no environment: accepted, ignored, not shown in help */
+    argh_env(&p, &rate, "FW_RATE");
 #ifndef ARGH_NO_FLOAT
     argh_double(&p, 'g', "gain", &gain, "Input gain");
 #endif
     fails += check(!argh_parse(&p, 4, argv), 2);
     fails += check(strstr(out, "Baud rate (default: 9600)") != NULL, 4);
+    fails += check(strstr(out, "[env:") == NULL, 32);
 #ifndef ARGH_NO_FLOAT
     fails += check(strstr(out, "Input gain (default: 0.25)") != NULL, 8);
 #endif

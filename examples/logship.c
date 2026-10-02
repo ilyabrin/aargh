@@ -179,6 +179,7 @@ static const argh_opt options[] = {
 
     ARGH_GROUP("Output"),
     ARGH_CUSTOM('t', "to", &cfg.to, &endpoint_type, "Collector address", ARGH_REQUIRED),
+    ARGH_ENV(&cfg.to, "LOGSHIP_TO"), /* set once in the container, not per run */
     ARGH_ENUM('f', "format", &cfg.format, formats, "Record format"),
     ARGH_FLAG(0, "gzip", &cfg.gzip, "Compress with gzip"),
     ARGH_FLAG(0, "zstd", &cfg.zstd, "Compress with zstd"),
