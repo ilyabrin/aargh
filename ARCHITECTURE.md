@@ -12,16 +12,16 @@ argh.h is a single C99 header. You describe options as data (`argh_opt` entries 
 
 Every design question was settled against these, in this order:
 
-| Principle | What it means in the code |
-| --- | --- |
-| **Wrong input never becomes a wrong value** | Numbers are checked completely, ambiguous syntax is an error, the parser never guesses. |
-| **Mistakes show up as early as possible** | Wrong variable types warn at compile time, mismatched settings fail at link time, bad definitions fail on the first run. |
-| **Bind to variables** | No lookups by name after parsing, so a typo in a name can't fail silently. Defaults are the variables' initial values. |
-| **Zero allocation, no global state** | Strings point into `argv`; lists use buffers the caller owns; the parser can live on the stack. |
-| **Data first** | The option table is the source of truth. Builder calls are sugar that fill a table. |
-| **Pay for what you use** | Commands, suggestions, stdio and floating point can be compiled out; rule checking is dropped by the linker when unused. |
-| **Never take control away** | The library never calls `exit()` and never prints unless asked; the program decides. |
-| **Measured, not claimed** | Every number in the docs comes from code in `bench/` that anyone can run. |
+| Principle                                   | What it means in the code                                                                                                |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Wrong input never becomes a wrong value** | Numbers are checked completely, ambiguous syntax is an error, the parser never guesses.                                  |
+| **Mistakes show up as early as possible**   | Wrong variable types warn at compile time, mismatched settings fail at link time, bad definitions fail on the first run. |
+| **Bind to variables**                       | No lookups by name after parsing, so a typo in a name can't fail silently. Defaults are the variables' initial values.   |
+| **Zero allocation, no global state**        | Strings point into `argv`; lists use buffers the caller owns; the parser can live on the stack.                          |
+| **Data first**                              | The option table is the source of truth. Builder calls are sugar that fill a table.                                      |
+| **Pay for what you use**                    | Commands, suggestions, stdio and floating point can be compiled out; rule checking is dropped by the linker when unused. |
+| **Never take control away**                 | The library never calls `exit()` and never prints unless asked; the program decides.                                     |
+| **Measured, not claimed**                   | Every number in the docs comes from code in `bench/` that anyone can run.                                                |
 
 ## Layout of argh.h
 
@@ -36,18 +36,18 @@ The file has two parts. The first is the public header, read by every file that 
 
 **Implementation, in order:**
 
-| Section | What is there |
-| --- | --- |
-| Iteration and slots | `ARGH__EACH`, `argh__slot_count`, `argh__slot`, command lookup |
-| Output helpers | the default writer, a bounded string builder (`argh__sb_*`), number formatting without printf |
-| Option lookup | `argh__find_long`, `argh__find_short`, the "seen" bitset |
-| Value conversion | `argh__parse_long`, `argh__parse_double`, `argh__parse_bool`, `argh__store` |
-| The scanner | `argh__apply`, `argh__move_positional`, `argh__scan`, `tool help <command>` |
-| Checks after the scan | positionals, required options, rules, the validator, definition checks |
-| Suggestions | edit distance and the search for the closest name |
-| Public setup functions | `argh_init` ... `argh_metavar` |
-| `argh_parse` and results | the pipeline below, `argh_exit_code`, `argh_given`, `argh_run` |
-| Errors and help | `argh_format_error`, help layout and `argh_print_help` |
+| Section                  | What is there                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| Iteration and slots      | `ARGH__EACH`, `argh__slot_count`, `argh__slot`, command lookup                                |
+| Output helpers           | the default writer, a bounded string builder (`argh__sb_*`), number formatting without printf |
+| Option lookup            | `argh__find_long`, `argh__find_short`, the "seen" bitset                                      |
+| Value conversion         | `argh__parse_long`, `argh__parse_double`, `argh__parse_bool`, `argh__store`                   |
+| The scanner              | `argh__apply`, `argh__move_positional`, `argh__scan`, `tool help <command>`                   |
+| Checks after the scan    | positionals, required options, rules, the validator, definition checks                        |
+| Suggestions              | edit distance and the search for the closest name                                             |
+| Public setup functions   | `argh_init` ... `argh_metavar`                                                                |
+| `argh_parse` and results | the pipeline below, `argh_exit_code`, `argh_given`, `argh_run`                                |
+| Errors and help          | `argh_format_error`, help layout and `argh_print_help`                                        |
 
 Internal names start with `argh__` / `ARGH__`; everything public starts with `argh_` / `ARGH_`, so argh never collides with your names and you can tell at a glance what is API.
 
@@ -120,29 +120,29 @@ Usage examples are entries in the option tables (`ARGH__K_EXAMPLE`, with the com
 
 The decisions that shaped the library, with the reason that settled each one.
 
-| Decision | Why |
-| --- | --- |
-| Values are written into your variables; no `get` calls | A misspelled name in `get_int("jobs")` compiles and fails at run time; a misspelled variable doesn't compile. |
-| Defaults are the variables' initial values | No default strings to parse, and help can always show the real value. |
-| No heap, ever | Works on MCUs, can't leak, nothing to free. The benchmark counts allocations to keep it that way. |
-| `010` is ten; hex needs `0x`; no octal | Octal surprises are a classic source of bugs in config and scripts. |
-| `-o=file` is an error | getopt stores `=file`. Rejecting it with a hint costs the user one second. |
-| No abbreviations of long options | Prefix matching breaks scripts when a new option with the same prefix is added. |
-| A value option always takes the next argument | So `-n -5` and `--pattern -foo` work; the only exception is `--`. |
-| Usage errors exit with 2 | The Unix convention (GNU tools, Python's argparse); scripts can tell misuse from failure. |
-| Help on stdout, errors on stderr | `tool --help | less` works, and a failed run never looks like success in a pipeline. |
-| A missing command is an error with the list of commands, not full help | Same reason: exit code and output must say "this failed". |
-| `-h` and `-V` reserved, with `ARGH_NO_AUTO_HELP` to opt out | The GNU convention; tools that need `-h` for host can turn it off. |
-| Rules refer to variables, not names | A typo is a compile error, and matching is a pointer comparison. |
-| Custom types are a constant `argh_type` struct | ISO C can't store a function pointer in `const void *`, and a new field would grow every option. A shared constant costs nothing per option and also lets help show defaults. |
-| Duplicate-name and command-tree checks only without `NDEBUG` | They compare every pair of options; like `assert`, they catch mistakes during development and cost nothing in release builds. |
-| Settings mismatch caught at link time | Silent memory corruption is the worst failure a C library can have. |
-| `argh_set_flags` replaces flags; error code values are stable | Settled at the v1.0 API review so they can be relied on. |
-| No hand-written assembly or SIMD | Considered for `strncmp`: the C library's versions are already vectorized, assembly would break portability, and profiling showed the time went elsewhere. |
-| `ARGH_NO_FLOAT` exists | Measuring a real firmware link showed `strtod` pulling in 27 KB, printf included, out of 38 KB. |
-| Examples in help are checked by parsing them | Documentation that compiles but lies is worse than none; a renamed option should break the build of the docs, not the user's copy-paste. |
-| Examples live in option tables, not in a parser field | Keeps the parser state at 248 bytes and gives commands their own examples for free. |
-| Environment variables are table entries bound to a variable | Same reasons as examples, plus a typo in the variable is a compile error, like in rules. Firmware has no environment by default, so `getenv` and the code around it stay out of the image. |
+| Decision                                                               | Why                                                                                                                                                                                        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Values are written into your variables; no `get` calls                 | A misspelled name in `get_int("jobs")` compiles and fails at run time; a misspelled variable doesn't compile.                                                                              |
+| Defaults are the variables' initial values                             | No default strings to parse, and help can always show the real value.                                                                                                                      |
+| No heap, ever                                                          | Works on MCUs, can't leak, nothing to free. The benchmark counts allocations to keep it that way.                                                                                          |
+| `010` is ten; hex needs `0x`; no octal                                 | Octal surprises are a classic source of bugs in config and scripts.                                                                                                                        |
+| `-o=file` is an error                                                  | getopt stores `=file`. Rejecting it with a hint costs the user one second.                                                                                                                 |
+| No abbreviations of long options                                       | Prefix matching breaks scripts when a new option with the same prefix is added.                                                                                                            |
+| A value option always takes the next argument                          | So `-n -5` and `--pattern -foo` work; the only exception is `--`.                                                                                                                          |
+| Usage errors exit with 2                                               | The Unix convention (GNU tools, Python's argparse); scripts can tell misuse from failure.                                                                                                  |
+| Help on stdout, errors on stderr                                       | `tool --help                                                                                                                                                                               | less` works, and a failed run never looks like success in a pipeline. |
+| A missing command is an error with the list of commands, not full help | Same reason: exit code and output must say "this failed".                                                                                                                                  |
+| `-h` and `-V` reserved, with `ARGH_NO_AUTO_HELP` to opt out            | The GNU convention; tools that need `-h` for host can turn it off.                                                                                                                         |
+| Rules refer to variables, not names                                    | A typo is a compile error, and matching is a pointer comparison.                                                                                                                           |
+| Custom types are a constant `argh_type` struct                         | ISO C can't store a function pointer in `const void *`, and a new field would grow every option. A shared constant costs nothing per option and also lets help show defaults.              |
+| Duplicate-name and command-tree checks only without `NDEBUG`           | They compare every pair of options; like `assert`, they catch mistakes during development and cost nothing in release builds.                                                              |
+| Settings mismatch caught at link time                                  | Silent memory corruption is the worst failure a C library can have.                                                                                                                        |
+| `argh_set_flags` replaces flags; error code values are stable          | Settled at the v1.0 API review so they can be relied on.                                                                                                                                   |
+| No hand-written assembly or SIMD                                       | Considered for `strncmp`: the C library's versions are already vectorized, assembly would break portability, and profiling showed the time went elsewhere.                                 |
+| `ARGH_NO_FLOAT` exists                                                 | Measuring a real firmware link showed `strtod` pulling in 27 KB, printf included, out of 38 KB.                                                                                            |
+| Examples in help are checked by parsing them                           | Documentation that compiles but lies is worse than none; a renamed option should break the build of the docs, not the user's copy-paste.                                                   |
+| Examples live in option tables, not in a parser field                  | Keeps the parser state at 248 bytes and gives commands their own examples for free.                                                                                                        |
+| Environment variables are table entries bound to a variable            | Same reasons as examples, plus a typo in the variable is a compile error, like in rules. Firmware has no environment by default, so `getenv` and the code around it stay out of the image. |
 
 The full design notes, including alternatives that were rejected, are kept by the maintainer and summarized here.
 

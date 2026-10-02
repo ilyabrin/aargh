@@ -368,6 +368,126 @@ TEST(test_long)
 #endif
 }
 
+TEST(test_uint_and_size)
+{
+    ARGV("--u=4000000000", "--x", "0xFFFFFFFF", "--p=+3", "--s", "0x10");
+    unsigned u = 0, x = 0, plus = 0;
+    size_t s = 0;
+    argh_parser p;
+    setup(&p);
+    argh_uint(&p, 0, "u", &u, "");
+    argh_uint(&p, 0, "x", &x, "");
+    argh_uint(&p, 0, "p", &plus, "");
+    argh_size(&p, 0, "s", &s, "");
+
+#if UINT_MAX >= 4294967295U
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(u == 4000000000U);
+    ASSERT_TRUE(x == 0xFFFFFFFFU);
+    ASSERT_EQ(plus, 3);
+    ASSERT_TRUE(s == 16);
+#endif
+}
+
+static argh_err parse_uint_value(const char *text, bool size)
+{
+    char *argv[] = {(char *)"prog", (char *)"-n", (char *)text, NULL};
+    unsigned n = 7;
+    size_t z = 7;
+    argh_parser p;
+    setup(&p);
+    if (size)
+        argh_size(&p, 'n', "num", &z, "");
+    else
+        argh_uint(&p, 'n', "num", &n, "");
+    argh_parse(&p, 3, argv);
+    /* A rejected value must leave the variable alone */
+    if (argh_last_error(&p)->code != ARGH_E_NONE && (n != 7 || z != 7))
+        return ARGH_E_CONFIG;
+    return argh_last_error(&p)->code;
+}
+
+TEST(test_uint_rejects_bad_input)
+{
+    ASSERT_EQ(parse_uint_value("-1", false), ARGH_E_INVALID_VALUE); /* strtoul would give UINT_MAX */
+    ASSERT_EQ(parse_uint_value("-0", false), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("-1", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("abc", false), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("0x", false), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("+", false), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value(" 5", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("0", false), ARGH_E_NONE);
+    ASSERT_EQ(parse_uint_value("99999999999999999999999", true), ARGH_E_OUT_OF_RANGE);
+    ASSERT_EQ(parse_uint_value("0x10000000000000000", true), ARGH_E_OUT_OF_RANGE);
+#if UINT_MAX == 4294967295U
+    ASSERT_EQ(parse_uint_value("4294967295", false), ARGH_E_NONE);
+    ASSERT_EQ(parse_uint_value("4294967296", false), ARGH_E_OUT_OF_RANGE);
+    ASSERT_EQ(parse_uint_value("0x100000000", false), ARGH_E_OUT_OF_RANGE);
+#endif
+#if SIZE_MAX == 18446744073709551615U
+    ASSERT_EQ(parse_uint_value("18446744073709551615", true), ARGH_E_NONE);
+    ASSERT_EQ(parse_uint_value("18446744073709551616", true), ARGH_E_OUT_OF_RANGE);
+#elif SIZE_MAX == 4294967295U
+    ASSERT_EQ(parse_uint_value("4294967295", true), ARGH_E_NONE);
+    ASSERT_EQ(parse_uint_value("4294967296", true), ARGH_E_OUT_OF_RANGE);
+#endif
+}
+
+TEST(test_uint_error_message)
+{
+    ARGV("--size", "-5");
+    size_t size = 4;
+    argh_parser p;
+    setup(&p);
+    argh_size(&p, 0, "size", &size, "");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "invalid value '-5' for '--size': expected a non-negative integer");
+}
+
+static unsigned ut_retries = 3;
+static size_t ut_limit = SIZE_MAX;
+static const argh_opt ut_opts[] = {
+    ARGH_UINT('r', "retries", &ut_retries, "Retries"),
+    ARGH_SIZE(0, "limit", &ut_limit, "Byte limit"),
+    ARGH_ENV(&ut_limit, "TOOL_LIMIT"),
+    ARGH_END,
+};
+
+TEST(test_uint_table_help)
+{
+    ARGV("--help");
+    char max[32];
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, ut_opts);
+    snprintf(max, sizeof(max), "(default: %llu)", (unsigned long long)SIZE_MAX);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "-r, --retries <n>  Retries (default: 3)\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, max) != NULL);
+}
+
+TEST(test_uint_from_env)
+{
+    ARGV0();
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, ut_opts);
+    set_env("TOOL_LIMIT", "0x400");
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(ut_limit == 1024);
+
+    reset_output(); /* clears the fake environment too */
+    setup(&p);
+    argh_table(&p, ut_opts);
+    set_env("TOOL_LIMIT", "-1");
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p),
+                  "invalid value '-1' in TOOL_LIMIT for '--limit': expected a non-negative integer");
+}
+
 #ifndef ARGH_NO_FLOAT
 TEST(test_double)
 {
@@ -2822,6 +2942,11 @@ int main(void)
     RUN_TEST(test_int_rejects_bad_input);
     RUN_TEST(test_int_error_message);
     RUN_TEST(test_long);
+    RUN_TEST(test_uint_and_size);
+    RUN_TEST(test_uint_rejects_bad_input);
+    RUN_TEST(test_uint_error_message);
+    RUN_TEST(test_uint_table_help);
+    RUN_TEST(test_uint_from_env);
 #ifndef ARGH_NO_FLOAT
     RUN_TEST(test_double);
     RUN_TEST(test_double_rejects_bad_input);

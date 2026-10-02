@@ -8,39 +8,39 @@ Everything below was measured or tried, not taken from documentation. Reproduce 
 
 ## Features
 
-|                                        | argh.h                            | getopt_long                  | cargs                     | argparse                         |
-| -------------------------------------- | --------------------------------- | ---------------------------- | ------------------------- | -------------------------------- |
-| Files to add                           | 1 header                          | none (libc; not on MSVC)     | `.h` + `.c`               | `.h` + `.c`                      |
-| Values                                 | written into typed variables      | strings                      | strings                   | written into typed variables     |
-| Types                                  | bool, count, int, long, double, string, enum, list, custom | -   | -                         | bool, bit, int, float, string    |
-| Numbers checked (range, garbage)       | yes                               | your code                    | your code                 | partly, see below                |
-| Generated help                         | usage, arguments, groups, defaults | no                          | option list               | usage, options, groups           |
-| Required options and positionals       | yes                               | no                           | no                        | no                               |
-| Named positionals in help              | yes                               | no                           | no                        | no                               |
-| Commands (`tool remote add`)           | yes, nested, with help per level  | no                           | no                        | no (by hand)                     |
-| Rules between options                  | yes                               | no                           | no                        | no                               |
-| "Did you mean" suggestions             | yes                               | no                           | no                        | no                               |
-| `--no-flag`                            | opt-in per flag                   | no                           | no                        | automatic for booleans           |
-| Abbreviated long options (`--jo`)      | no (an error)                     | yes                          | no                        | no                               |
-| Returns to your program on errors and `--help` | yes                       | yes                          | yes                       | no: calls `exit()`               |
-| Exit code on a usage error             | 2 (`argh_exit_code`)              | your choice                  | your choice               | 1                                |
-| Global state                           | none                              | `optind`, `optarg`           | none                      | none                             |
-| Output redirectable (no stdio needed)  | yes                               | no (can be silenced)         | yes (printer function)    | no                               |
+|                                                | argh.h                                                     | getopt_long              | cargs                  | argparse                      |
+| ---------------------------------------------- | ---------------------------------------------------------- | ------------------------ | ---------------------- | ----------------------------- |
+| Files to add                                   | 1 header                                                   | none (libc; not on MSVC) | `.h` + `.c`            | `.h` + `.c`                   |
+| Values                                         | written into typed variables                               | strings                  | strings                | written into typed variables  |
+| Types                                          | bool, count, int, long, double, string, enum, list, custom | -                        | -                      | bool, bit, int, float, string |
+| Numbers checked (range, garbage)               | yes                                                        | your code                | your code              | partly, see below             |
+| Generated help                                 | usage, arguments, groups, defaults                         | no                       | option list            | usage, options, groups        |
+| Required options and positionals               | yes                                                        | no                       | no                     | no                            |
+| Named positionals in help                      | yes                                                        | no                       | no                     | no                            |
+| Commands (`tool remote add`)                   | yes, nested, with help per level                           | no                       | no                     | no (by hand)                  |
+| Rules between options                          | yes                                                        | no                       | no                     | no                            |
+| "Did you mean" suggestions                     | yes                                                        | no                       | no                     | no                            |
+| `--no-flag`                                    | opt-in per flag                                            | no                       | no                     | automatic for booleans        |
+| Abbreviated long options (`--jo`)              | no (an error)                                              | yes                      | no                     | no                            |
+| Returns to your program on errors and `--help` | yes                                                        | yes                      | yes                    | no: calls `exit()`            |
+| Exit code on a usage error                     | 2 (`argh_exit_code`)                                       | your choice              | your choice            | 1                             |
+| Global state                                   | none                                                       | `optind`, `optarg`       | none                   | none                          |
+| Output redirectable (no stdio needed)          | yes                                                        | no (can be silenced)     | yes (printer function) | no                            |
 
 ## Behavior on tricky input
 
 One integer option, `-j`/`--jobs`. What each program ends up with:
 
-| Input                  | argh.h                                        | cargs (+ `atoi`)       | argparse                          |
-| ---------------------- | --------------------------------------------- | ---------------------- | --------------------------------- |
-| `--jobs 8`             | 8                                             | 8                      | 8                                 |
-| `--jobs 010`           | 10                                            | 10                     | **8** (read as octal)             |
-| `--jobs 99999999999`   | error: out of range, exit 2                   | **1215752191**         | **1215752191**, no error          |
-| `--jobs 5x`            | error: expected an integer, exit 2            | **5**                  | error, exit 1                     |
-| `--jobs=`              | error: expected an integer, exit 2            | **0**                  | **0**, no error                   |
-| `--jbos 3`             | error with "did you mean '--jobs'?", exit 2   | error, exit 1          | error and usage, exit 1           |
-| `-j=3`                 | error: write `-j VALUE` or `--jobs=VALUE`     | 3                      | error, exit 1                     |
-| `--jobs` (no value)    | error: requires a value, exit 2               | **no error, value NULL** | error, exit 1                   |
+| Input                | argh.h                                      | cargs (+ `atoi`)         | argparse                 |
+| -------------------- | ------------------------------------------- | ------------------------ | ------------------------ |
+| `--jobs 8`           | 8                                           | 8                        | 8                        |
+| `--jobs 010`         | 10                                          | 10                       | **8** (read as octal)    |
+| `--jobs 99999999999` | error: out of range, exit 2                 | **1215752191**           | **1215752191**, no error |
+| `--jobs 5x`          | error: expected an integer, exit 2          | **5**                    | error, exit 1            |
+| `--jobs=`            | error: expected an integer, exit 2          | **0**                    | **0**, no error          |
+| `--jbos 3`           | error with "did you mean '--jobs'?", exit 2 | error, exit 1            | error and usage, exit 1  |
+| `-j=3`               | error: write `-j VALUE` or `--jobs=VALUE`   | 3                        | error, exit 1            |
+| `--jobs` (no value)  | error: requires a value, exit 2             | **no error, value NULL** | error, exit 1            |
 
 Bold marks a wrong value that the program would go on to use. cargs returns strings and leaves checking to your program; the column shows the shortest conversion, `atoi`. With `strtol` and your own checks, the results can match argh's. `getopt_long` is in the same position as cargs; in addition it accepts `--jo 3` as `--jobs 3`, and gives `=3` as the value of `-j=3`.
 
@@ -63,20 +63,20 @@ argh is 10% to 14% faster than `getopt_long`, on par with cargs, and 6% to 15% s
 
 `.text` added to the same 3-option program (bench/size_none.c as the baseline), Linux, release builds: `-Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections`:
 
-| Parser                                             | GCC 13.3 | Clang 18.1 |
-| -------------------------------------------------- | -------: | ---------: |
-| argh                                               |  18.3 KB |    22.6 KB |
-| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`)          |  15.3 KB |    17.8 KB |
-| cargs                                              |   2.9 KB |     2.9 KB |
-| argparse                                           |   4.2 KB |     3.9 KB |
-| getopt_long                                        |   0.6 KB |     0.5 KB |
+| Parser                                    | GCC 13.3 | Clang 18.1 |
+| ----------------------------------------- | -------: | ---------: |
+| argh                                      |  18.6 KB |    23.0 KB |
+| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`) |  15.6 KB |    18.3 KB |
+| cargs                                     |   2.9 KB |     2.9 KB |
+| argparse                                  |   4.2 KB |     3.9 KB |
+| getopt_long                               |   0.6 KB |     0.5 KB |
 
 On a Cortex-M0 (newlib-nano, the same program printing with `printf`):
 
 | Parser                    | Flash added |
 | ------------------------- | ----------: |
-| argh                      |     32.9 KB |
-| argh with `ARGH_NO_FLOAT` |     11.2 KB |
+| argh                      |     32.7 KB |
+| argh with `ARGH_NO_FLOAT` |     10.9 KB |
 | cargs                     |      1.7 KB |
 | argparse                  |     22.6 KB |
 

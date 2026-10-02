@@ -100,6 +100,8 @@ For a program in one file, or a library that ships its own copy of argh.h, `#def
 | `argh_count`  | `ARGH_COUNT`  | `int`          | `-vvv` adds 3                            |
 | `argh_int`    | `ARGH_INT`    | `int`          | `-j4`, `-j 4`, `--jobs=4`, `--jobs 0x10` |
 | `argh_long`   | `ARGH_LONG`   | `long`         | same as `int`                            |
+| `argh_uint`   | `ARGH_UINT`   | `unsigned`     | same as `int`, a minus sign is an error  |
+| `argh_size`   | `ARGH_SIZE`   | `size_t`       | same as `unsigned`                       |
 | `argh_double` | `ARGH_DOUBLE` | `double`       | `--ratio 0.5`, `--ratio=1e-3`            |
 | `argh_string` | `ARGH_STRING` | `const char *` | `-o file`, `-ofile`, `--output=file`     |
 | `argh_enum`   | `ARGH_ENUM`   | `int` (index)  | `--mode fast`                            |
@@ -570,7 +572,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.5 to 9.8 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.2 to 9.5 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -643,6 +645,8 @@ argh_opt *argh_flag  (argh_parser *p, char s, const char *l, bool *target, const
 argh_opt *argh_count (argh_parser *p, char s, const char *l, int *target, const char *help);
 argh_opt *argh_int   (argh_parser *p, char s, const char *l, int *target, const char *help);
 argh_opt *argh_long  (argh_parser *p, char s, const char *l, long *target, const char *help);
+argh_opt *argh_uint  (argh_parser *p, char s, const char *l, unsigned *target, const char *help);
+argh_opt *argh_size  (argh_parser *p, char s, const char *l, size_t *target, const char *help);
 argh_opt *argh_double(argh_parser *p, char s, const char *l, double *target, const char *help);  /* float */
 argh_opt *argh_string(argh_parser *p, char s, const char *l, const char **target, const char *help);
 argh_opt *argh_enum  (argh_parser *p, char s, const char *l, int *target, const char *const *choices, const char *help);
@@ -683,6 +687,7 @@ ARGH_COUNT(s, l, &int_var, help, ...)        ARGH_ENUM(s, l, &int_var, choices, 
 ARGH_INT(s, l, &int_var, help, ...)          ARGH_LIST(s, l, &values_var, help, ...)
 ARGH_LONG(s, l, &long_var, help, ...)        ARGH_POS(name, &str_var, help, ...)
 ARGH_DOUBLE(s, l, &double_var, help, ...)    ARGH_REST(name, &values_var, help, ...)
+ARGH_UINT(s, l, &unsigned_var, help, ...)    ARGH_SIZE(s, l, &size_var, help, ...)
 ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
 ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
@@ -704,7 +709,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.3.0" */
+ARGH_VERSION          /* "1.4.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -818,7 +823,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.5 to 11.7 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.2 to 11.4 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks
