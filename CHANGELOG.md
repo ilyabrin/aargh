@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- CI runs the full test suite on more platforms: Linux ARM64, 32-bit x86, and under qemu 32-bit ARM and big-endian s390x and PowerPC.
 - Usage examples in help: `argh_example(&p, "tool -j 8 data.csv", "What it does")` or `ARGH_EXAMPLE(...)` in a table. They are listed at the end of the program's help, or of a command's help when they sit in the command's table.
 - Examples are checked: in builds without `NDEBUG`, `argh_parse` parses every example against the current options, commands and rules, without writing to any variable, and fails with `ARGH_E_CONFIG` and a message naming the example if one doesn't work. Release builds skip the check, and the parser does not grow.
 - Cost in a release build: about 180 bytes of flash on a Cortex-M0 for the help section, even without examples. The check itself exists only in debug builds.
