@@ -40,11 +40,11 @@ jobs:
           -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
       - name: Fuzz argh_parse for 2 minutes
         run: make fuzz FUZZ_TIME=120
-      - name: Reduced release build (ARGH_NO_COMMANDS, ARGH_NO_SUGGEST, ARGH_NO_STDIO, ARGH_NO_FLOAT, NDEBUG)
+      - name: Reduced release build (ARGH_NO_COMMANDS, ARGH_NO_SUGGEST, ARGH_NO_STDIO, ARGH_NO_FLOAT, ARGH_HELP_WIDTH=0, NDEBUG)
         run: >
           make clean && make CC=clang test
           CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g
-          -DARGH_NO_COMMANDS -DARGH_NO_SUGGEST -DARGH_NO_STDIO -DARGH_NO_FLOAT -DNDEBUG
+          -DARGH_NO_COMMANDS -DARGH_NO_SUGGEST -DARGH_NO_STDIO -DARGH_NO_FLOAT -DARGH_HELP_WIDTH=0 -DNDEBUG
           -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
 
   # 32-bit x86: 4-byte long and pointers, the sizes most firmware has

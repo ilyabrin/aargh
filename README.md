@@ -384,6 +384,16 @@ argh_version(&p, "1.4.2");   /* ./mytool --version  ->  mytool 1.4.2 */
 
 Help shows the defaults from your variables before parsing, so they are always accurate. `argh_parse` returns `false` after printing help, and `argh_exit_code` returns 0.
 
+Long descriptions wrap at 80 columns, lined up under the description column, and a default stays whole on one line:
+
+```console
+  -r, --retries <n>        How many times to retry a failed upload before giving
+                           up on that file and moving on to the next one
+                           (default: 3)
+```
+
+A `\n` in a description starts a new line at the same column. Set the width with `ARGH_HELP_WIDTH`, or turn wrapping off with `0`, which also leaves its code out (about 250 bytes on a microcontroller). Below 60 columns, lines next to long option names can pass the width. Usage examples are never wrapped, so they can be copied as they are.
+
 Need `-h` for something else, like `--host`? Turn the built-ins off with `argh_set_flags(&p, ARGH_NO_AUTO_HELP)` and call `argh_print_help(&p)` yourself.
 
 ### Examples in help
@@ -489,7 +499,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.6 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.8 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -524,6 +534,7 @@ Define before including `argh.h`, the same way in every file that includes it. T
 | `ARGH_BUILDER_CAP` |      32 | Options that builder calls can add. `0` if you only use tables                 |
 | `ARGH_MAX_OPTS`    |      64 | Options on the active command path, all tables combined                        |
 | `ARGH_MAX_TABLES`  |       8 | Tables per parser. The builder counts as one                                   |
+| `ARGH_HELP_WIDTH`  |      80 | Column where help text wraps. `0` turns wrapping off                           |
 | `ARGH_MAX_DEPTH`   |       4 | Levels of nested commands                                                      |
 | `ARGH_NO_SUGGEST`  |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
 | `ARGH_NO_COMMANDS` |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
@@ -729,7 +740,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.5 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.7 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks

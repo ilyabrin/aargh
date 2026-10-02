@@ -89,11 +89,11 @@ Read this one with care:
 
 Flash added to a bare-metal firmware shell command with three options, compared with the same firmware without a parser. `arm-none-eabi-gcc` 13.2, newlib-nano, `-Os -ffunction-sections -fdata-sections -Wl,--gc-sections`, `-DNDEBUG -DARGH_NO_STDIO`. CI fails if a build goes over its budget.
 
-| Build                                            | Cortex-M0 | Cortex-M4 | Budget  |
-| ------------------------------------------------ | --------: | --------: | ------: |
-| `ARGH_NO_FLOAT`                                  |   11.2 KB |   11.5 KB | 12.0 KB |
-| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST` |    9.4 KB |    9.6 KB | 10.0 KB |
-| with `argh_double` (`ARGH_NO_STDIO` only)        |   38.2 KB |   31.8 KB |       - |
+| Build                                                                 | Cortex-M0 | Cortex-M4 |  Budget |
+| --------------------------------------------------------------------- | --------: | --------: | ------: |
+| `ARGH_NO_FLOAT`                                                       |   11.4 KB |   11.7 KB | 12.0 KB |
+| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST`, `ARGH_HELP_WIDTH=0` |    9.4 KB |    9.8 KB | 10.0 KB |
+| with `argh_double` (`ARGH_NO_STDIO` only)                             |   38.4 KB |   32.1 KB |       - |
 
 - **Numbers include everything linked because of argh**: help and error strings, and the C library functions it calls (`strtol`, `strcmp` and others).
 - **Why doubles cost 27 KB:** newlib's `strtod` brings its float parser and soft-float arithmetic, and through an internal `assert` also `fprintf`. `ARGH_NO_FLOAT` removes `argh_double` so none of it is linked.

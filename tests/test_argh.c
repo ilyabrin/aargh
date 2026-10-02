@@ -2163,6 +2163,101 @@ TEST(test_suggest_on_command_path)
 #endif /* ARGH_NO_SUGGEST */
 
 /* ============================================================================
+ * Wrapping long help text
+ * ============================================================================ */
+
+#if ARGH_HELP_WIDTH >= 60 || ARGH_HELP_WIDTH == 0
+static int wr_retries = 3;
+static const char *wr_cache = "/var/cache/tool";
+static bool wr_force;
+
+static void setup_wrap(argh_parser *p)
+{
+    argh_init(p, "tool", "Synchronizes a local directory with a remote bucket, uploading new and changed "
+                         "files and optionally deleting files that no longer exist locally.");
+    argh_set_writer(p, capture, NULL);
+    argh_int(p, 'r', "retries", &wr_retries,
+             "How many times to retry a failed upload before giving up on that file and moving on to the next one");
+    argh_string(p, 0, "cache-dir", &wr_cache, "Directory for the upload cache.\nDelete it to force a full upload.");
+    argh_flag(p, 'f', "force", &wr_force,
+              "Upload even if https://example.com/a/very/long/url/that/does/not/fit/on/one/line/at/all says no");
+    argh_example(p, "tool --retries 5 --force",
+                 "Upload, retrying each failed file up to five times before reporting it as failed");
+}
+#endif
+
+#if ARGH_HELP_WIDTH == 80
+TEST(test_help_wraps_at_80)
+{
+    ARGV("--help");
+    argh_parser p;
+    setup_wrap(&p);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(out_text,
+                  "Usage: tool [OPTIONS]\n"
+                  "\n"
+                  "Synchronizes a local directory with a remote bucket, uploading new and changed\n"
+                  "files and optionally deleting files that no longer exist locally.\n"
+                  "\n"
+                  "Options:\n"
+                  "  -r, --retries <n>        How many times to retry a failed upload before giving\n"
+                  "                           up on that file and moving on to the next one\n"
+                  "                           (default: 3)\n"
+                  "      --cache-dir <value>  Directory for the upload cache.\n"
+                  "                           Delete it to force a full upload.\n"
+                  "                           (default: /var/cache/tool)\n"
+                  "  -f, --force              Upload even if\n"
+                  "                           https://example.com/a/very/long/url/that/does/not/fit/on/one/line/at/all\n"
+                  "                           says no\n"
+                  "\n"
+                  "  -h, --help               Print help\n"
+                  "\n"
+                  "Examples:\n"
+                  "  tool --retries 5 --force\n"
+                  "      Upload, retrying each failed file up to five times before reporting it as\n"
+                  "      failed\n");
+}
+#endif
+
+#if ARGH_HELP_WIDTH >= 60
+/* From 60 columns on, no line passes the width unless it holds a single word,
+ * or a "(default: ...)" that is never split. Narrower widths leave too little
+ * room next to long option names to promise that. */
+TEST(test_help_lines_fit_width)
+{
+    ARGV("--help");
+    const char *line;
+    argh_parser p;
+    setup_wrap(&p);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    for (line = out_text; *line;)
+    {
+        const char *end = strchr(line, '\n');
+        const char *word = line;
+        size_t len = end ? (size_t)(end - line) : strlen(line);
+        while (*word == ' ')
+            word++;
+        if ((int)len > ARGH_HELP_WIDTH && strncmp(word, "(default: ", 10) != 0)
+            ASSERT_TRUE(memchr(word, ' ', len - (size_t)(word - line)) == NULL);
+        line += len + (end ? 1 : 0);
+    }
+}
+#endif
+#if ARGH_HELP_WIDTH == 0
+TEST(test_help_no_wrap)
+{
+    ARGV("--help");
+    argh_parser p;
+    setup_wrap(&p);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "giving up on that file and moving on to the next one (default: 3)\n") != NULL);
+}
+#endif
+
+/* ============================================================================
  * Examples in help
  * ============================================================================ */
 
@@ -2645,6 +2740,15 @@ int main(void)
 #endif
 #if !defined(ARGH_NO_SUGGEST) && !defined(ARGH_NO_COMMANDS)
     RUN_TEST(test_suggest_on_command_path);
+#endif
+#if ARGH_HELP_WIDTH == 80
+    RUN_TEST(test_help_wraps_at_80);
+#endif
+#if ARGH_HELP_WIDTH >= 60
+    RUN_TEST(test_help_lines_fit_width);
+#endif
+#if ARGH_HELP_WIDTH == 0
+    RUN_TEST(test_help_no_wrap);
 #endif
     RUN_TEST(test_example_in_help);
     RUN_TEST(test_example_builder);
