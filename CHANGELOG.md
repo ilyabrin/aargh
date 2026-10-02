@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - `ARGH_VERSION_MAJOR`, `ARGH_VERSION_MINOR`, `ARGH_VERSION_PATCH` and `ARGH_VERSION`, to check the version at compile time.
+- [ARCHITECTURE.md](ARCHITECTURE.md): how argh.h is organized, how a parse runs, the techniques behind it, the design decisions and the project's history.
 - [COMPARISON.md](COMPARISON.md): argh compared with getopt_long, cargs and argparse in features, behavior on tricky input, speed and size, reproducible with `bench/compare/compare.sh`.
 - [llms.txt](llms.txt): a guide for coding agents, with the setup, the rules that are easy to get wrong and every feature in short.
 - `ARGH_STATIC`: includes the implementation and makes every function `static`, for one-file programs and libraries that embed their own copy.

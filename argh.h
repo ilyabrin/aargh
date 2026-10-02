@@ -1049,9 +1049,6 @@ extern "C"
         return i + 1 < argc && argv[i + 1] && strcmp(argv[i + 1], "--") != 0;
     }
 
-    /* One pass over argv. With apply == false nothing is written: the pass
-     * only finds out whether help or version was requested, so that help can
-     * show the defaults before any option changes them. */
 #ifndef ARGH_NO_COMMANDS
     /* `tool help remote add`: selects the named commands, then asks for help */
     static int argh__help_command(argh_parser *p, int argc, char **argv, int i)
@@ -1073,6 +1070,9 @@ extern "C"
     }
 #endif
 
+    /* One pass over argv. With apply == false nothing is written: the pass
+     * only finds out whether help or version was requested, so that help can
+     * show the defaults before any option changes them. */
     static int argh__scan(argh_parser *p, int argc, char **argv, bool apply, int *positional_count)
     {
         int w = 1;

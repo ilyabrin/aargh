@@ -11,6 +11,8 @@ argh.h is in early development (0.x), and the API can still change until v1.0. B
 
 Found a security problem? Don't open an issue, see [SECURITY.md](SECURITY.md).
 
+Before larger changes, [ARCHITECTURE.md](ARCHITECTURE.md) explains how the code is organized, how a parse runs and why the design is the way it is.
+
 ## Build and test
 
 You need a C99 compiler and `make`. That's it.
