@@ -47,6 +47,14 @@ jobs:
           -DARGH_NO_COMMANDS -DARGH_NO_SUGGEST -DARGH_NO_STDIO -DARGH_NO_FLOAT -DARGH_HELP_WIDTH=0 -DNDEBUG
           -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
 
+  # README, examples/README and llms.txt: code compiles, output is real
+  docs:
+    name: docs / examples match the code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: make docs-check
+
   # 32-bit x86: 4-byte long and pointers, the sizes most firmware has
   x86-32:
     name: ubuntu / gcc -m32

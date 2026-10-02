@@ -48,6 +48,8 @@ desktop.ini
 
 # Logs
 *.log
+# ...except the sample logs the examples read
+!examples/data/*.log
 
 # Binaries built by make (no extension on Linux and macOS)
 /test_argh

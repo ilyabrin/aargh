@@ -1,0 +1,5 @@
+2026-10-02 09:14:01 UTC [412] LOG:  database system is ready to accept connections
+2026-10-02 09:16:40 UTC [988] LOG:  duration: 812.004 ms  statement: SELECT * FROM orders WHERE status = 'open'
+2026-10-02 09:30:00 UTC [415] LOG:  checkpoint starting: time
+2026-10-02 09:30:04 UTC [415] LOG:  checkpoint complete: wrote 1204 buffers (7.3%)
+2026-10-02 09:41:17 UTC [1203] ERROR:  duplicate key value violates unique constraint "orders_pkey"

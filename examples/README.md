@@ -7,6 +7,8 @@ make examples   # build all three
 make smoke      # run them and check their output (CI does this on every push)
 ```
 
+The commands below run in this directory. [data/](data) holds small sample logs, so the output is the same on every system; `make docs-check` compares it with the real programs.
+
 | Example                    | What it is                                  | What it shows                                                                                   |
 | -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | [wc.c](wc.c)               | Counts lines, words and bytes, like `wc`    | Flags, a file list, `--help` and `--version` for free, examples in help                         |
@@ -20,12 +22,12 @@ make smoke      # run them and check their output (CI does this on every push)
 Eight lines of argh code, and it counts the same as the real `wc`.
 
 ```console
-$ ./wc LICENSE SECURITY.md
-      21     169    1087 LICENSE
-      33     147     998 SECURITY.md
-      54     316    2085 total
+$ ./wc data/app.log data/db.log
+      15     112     961 data/app.log
+       5      60     440 data/db.log
+      20     172    1401 total
 
-$ ./wc --line LICENSE
+$ ./wc --line data/app.log
 wc: unknown option '--line' (did you mean '--lines'?)
 Try 'wc --help' for more information.
 ```
@@ -81,11 +83,11 @@ Examples:
   logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem app.log
       With a client certificate
 
-$ ./logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem --chunk 1K --gzip -vv -x bench LICENSE SECURITY.md bench/size.sh
-  send  LICENSE: 1087 bytes in 2 requests
-  send  SECURITY.md: 998 bytes in 1 request
-  skip  bench/size.sh (excluded)
-Plan: 2 files, 2085 bytes in 3 requests to logs.example.com:6514
+$ ./logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem --chunk 512 --gzip -vv -x .1 data/app.log data/db.log data/app.log.1
+  send  data/app.log: 961 bytes in 2 requests
+  send  data/db.log: 440 bytes in 1 request
+  skip  data/app.log.1 (excluded)
+Plan: 2 files, 1401 bytes in 3 requests to logs.example.com:6514
       format json, gzip, TLS
       timeout 30s (default), 3 attempts
 ```
