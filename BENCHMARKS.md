@@ -71,9 +71,9 @@ The `.text` added to a minimal 3-option program, compared with the same program 
 | ---------------------------- | ------: | -----------: | ----------: |
 | Linux, GCC 13.3 (CI)         | 18.3 KB |      15.3 KB |      0.6 KB |
 | Linux, Clang 18.1 (CI)       | 22.6 KB |      17.8 KB |      0.5 KB |
-| Linux ARM64, GCC 13.3 (CI)   | 17.9 KB |              |      0.6 KB |
-| Linux ARM64, Clang 18.1 (CI) | 19.4 KB |              |      0.5 KB |
-| Windows, MinGW GCC 15.2 (CI) | 17.6 KB |              |     28.0 KB |
+| Linux ARM64, GCC 13.3 (CI)   | 18.9 KB |              |      0.6 KB |
+| Linux ARM64, Clang 18.1 (CI) | 20.8 KB |              |      0.5 KB |
+| Windows, MinGW GCC 15.2 (CI) | 18.6 KB |              |     28.0 KB |
 
 "Reduced" is `-DARGH_NO_COMMANDS -DARGH_NO_SUGGEST`, for programs that don't need commands or "did you mean" suggestions. What each option saves on Linux GCC: `ARGH_NO_COMMANDS` 2.3 KB, `ARGH_NO_SUGGEST` 0.8 KB, `ARGH_NO_FLOAT` 0.4 KB (far more on firmware, see below), `ARGH_HELP_WIDTH=0` 0.2 KB. Debug builds are about 2.5 KB larger: they also check your definitions and examples.
 
