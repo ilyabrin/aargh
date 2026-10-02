@@ -33,6 +33,8 @@ static struct
     bool verbose, force, color, dev, env;
     int count, jobs, mode, level;
     long seek;
+    unsigned retries;
+    size_t limit;
 #ifndef ARGH_NO_FLOAT
     double ratio;
 #endif
@@ -232,6 +234,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     argh_count(&p, 'v', "verbose", &v.count, "Verbose");
     argh_once(argh_int(&p, 'j', "jobs", &v.jobs, "Jobs"));
     argh_long(&p, 's', "seek", &v.seek, "Seek");
+    argh_uint(&p, 0, "retries", &v.retries, "Retries");
+    argh_size(&p, 0, "limit", &v.limit, "Limit");
 #ifndef ARGH_NO_FLOAT
     argh_double(&p, 'r', "ratio", &v.ratio, "Ratio");
 #endif

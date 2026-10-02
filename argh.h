@@ -130,6 +130,8 @@ extern "C"
         ARGH__K_COUNT,   /* int:           -vvv */
         ARGH__K_INT,     /* int:           -j 4, --jobs=4 */
         ARGH__K_LONG,    /* long:          same as int */
+        ARGH__K_UINT,    /* unsigned:      -n 4, no minus sign */
+        ARGH__K_SIZE,    /* size_t:        same as unsigned */
         ARGH__K_DOUBLE,  /* double:        --ratio 0.5 */
         ARGH__K_STRING,  /* const char *:  -o file */
         ARGH__K_ENUM,    /* int (index):   --mode fast */
@@ -370,6 +372,8 @@ extern "C"
     ARGH__DEF argh_opt *argh_count(argh_parser *p, char short_name, const char *long_name, int *target, const char *help);
     ARGH__DEF argh_opt *argh_int(argh_parser *p, char short_name, const char *long_name, int *target, const char *help);
     ARGH__DEF argh_opt *argh_long(argh_parser *p, char short_name, const char *long_name, long *target, const char *help);
+    ARGH__DEF argh_opt *argh_uint(argh_parser *p, char short_name, const char *long_name, unsigned *target, const char *help);
+    ARGH__DEF argh_opt *argh_size(argh_parser *p, char short_name, const char *long_name, size_t *target, const char *help);
 #ifndef ARGH_NO_FLOAT
     ARGH__DEF argh_opt *argh_double(argh_parser *p, char short_name, const char *long_name, double *target, const char *help);
 #endif
@@ -491,6 +495,8 @@ extern "C"
 #define ARGH_COUNT(s, l, target, ...) ARGH__OPT(s, l, ARGH__K_COUNT, int, target, NULL, __VA_ARGS__)
 #define ARGH_INT(s, l, target, ...) ARGH__OPT(s, l, ARGH__K_INT, int, target, NULL, __VA_ARGS__)
 #define ARGH_LONG(s, l, target, ...) ARGH__OPT(s, l, ARGH__K_LONG, long, target, NULL, __VA_ARGS__)
+#define ARGH_UINT(s, l, target, ...) ARGH__OPT(s, l, ARGH__K_UINT, unsigned, target, NULL, __VA_ARGS__)
+#define ARGH_SIZE(s, l, target, ...) ARGH__OPT(s, l, ARGH__K_SIZE, size_t, target, NULL, __VA_ARGS__)
 #ifndef ARGH_NO_FLOAT
 #define ARGH_DOUBLE(s, l, target, ...) ARGH__OPT(s, l, ARGH__K_DOUBLE, double, target, NULL, __VA_ARGS__)
 #endif
@@ -559,6 +565,7 @@ extern "C"
 #ifndef ARGH_NO_FLOAT
 #include <math.h>
 #endif
+#include <stdint.h>
 #ifndef ARGH_NO_STDIO
 #include <stdio.h>
 #endif
@@ -752,16 +759,29 @@ extern "C"
         argh__sb_putn(b, &c, 1);
     }
 
-    /* Decimal text of v; buf needs 24 bytes. Avoids pulling in printf. */
-    static const char *argh__fmt_long(char *buf, long v)
+    /* Wide enough for unsigned long and size_t, with no 64-bit math where
+     * both are 32 bits (most firmware) */
+#if SIZE_MAX > ULONG_MAX
+    typedef size_t argh__uint;
+#else
+    typedef unsigned long argh__uint;
+#endif
+
+    /* Decimal text of u; buf needs 24 bytes. Avoids pulling in printf. */
+    static char *argh__fmt_uint(char *buf, argh__uint u)
     {
         char *s = buf + 23;
-        /* Negate as unsigned so LONG_MIN works */
-        unsigned long u = v < 0 ? 0UL - (unsigned long)v : (unsigned long)v;
         *s = '\0';
         do
             *--s = (char)('0' + u % 10);
         while (u /= 10);
+        return s;
+    }
+
+    static const char *argh__fmt_long(char *buf, long v)
+    {
+        /* Negate as unsigned so LONG_MIN works */
+        char *s = argh__fmt_uint(buf, v < 0 ? 0UL - (unsigned long)v : (unsigned long)v);
         if (v < 0)
             *--s = '-';
         return s;
@@ -822,21 +842,10 @@ extern "C"
         return kind >= ARGH__K_FLAG && kind <= ARGH__K_CUSTOM;
     }
 
+    /* For option kinds only: every one but flags and counters takes a value */
     static bool argh__takes_value(const argh_opt *o)
     {
-        switch (o->kind)
-        {
-        case ARGH__K_INT:
-        case ARGH__K_LONG:
-        case ARGH__K_DOUBLE:
-        case ARGH__K_STRING:
-        case ARGH__K_ENUM:
-        case ARGH__K_LIST:
-        case ARGH__K_CUSTOM:
-            return true;
-        default:
-            return false;
-        }
+        return o->kind != ARGH__K_FLAG && o->kind != ARGH__K_COUNT;
     }
 
     static const argh_opt *argh__find_long(const argh_parser *p, const char *name, size_t len, int *index)
@@ -911,19 +920,40 @@ extern "C"
         return true;
     }
 
-    static argh_err argh__parse_long(const char *s, long lo, long hi, long *out)
+    /* No minus sign: strtoul would wrap "-1" around to the maximum. The digit
+     * loop works for any width and keeps strtol out of firmware images. */
+    static argh_err argh__parse_uint(const char *s, argh__uint hi, argh__uint *out)
     {
         int base;
-        char *end;
-        long v;
-        if (!argh__int_syntax(s, &base))
+        argh__uint v = 0;
+        if (*s == '-' || !argh__int_syntax(s, &base))
             return ARGH_E_INVALID_VALUE;
-        errno = 0;
-        v = strtol(s, &end, base);
-        if (errno == ERANGE || v < lo || v > hi)
-            return ARGH_E_OUT_OF_RANGE;
+        s += (*s == '+') + (base == 16 ? 2 : 0);
+        for (; *s; s++)
+        {
+            unsigned d = isdigit((unsigned char)*s) ? (unsigned)(*s - '0')
+                                                    : (unsigned)(tolower((unsigned char)*s) - 'a' + 10);
+            if (d > hi || v > (hi - d) / (unsigned)base)
+                return ARGH_E_OUT_OF_RANGE;
+            v = v * (unsigned)base + d;
+        }
         *out = v;
         return ARGH_E_NONE;
+    }
+
+    /* The magnitude goes through argh__parse_uint, bounded by -lo or hi */
+    static argh_err argh__parse_long(const char *s, long lo, long hi, long *out)
+    {
+        bool neg = *s == '-';
+        argh__uint u;
+        argh_err e;
+        if (neg && s[1] == '+')
+            return ARGH_E_INVALID_VALUE;
+        e = argh__parse_uint(s + neg, neg ? 0UL - (unsigned long)lo : (unsigned long)hi, &u);
+        if (e == ARGH_E_NONE)
+            /* Built from u - 1 so that LONG_MIN doesn't overflow */
+            *out = neg ? (u ? -(long)(u - 1) - 1 : 0) : (long)u;
+        return e;
     }
 
 #ifndef ARGH_NO_FLOAT
@@ -971,6 +1001,7 @@ extern "C"
     static argh_err argh__store(const argh_opt *o, const char *v, bool negated, const char **reason, bool write)
     {
         long l;
+        argh__uint u;
 #ifndef ARGH_NO_FLOAT
         double d;
 #endif
@@ -1002,6 +1033,18 @@ extern "C"
                 return e;
             if (write)
                 *(long *)o->target = l;
+            return ARGH_E_NONE;
+        case ARGH__K_UINT:
+            if ((e = argh__parse_uint(v, UINT_MAX, &u)) != ARGH_E_NONE)
+                return e;
+            if (write)
+                *(unsigned *)o->target = (unsigned)u;
+            return ARGH_E_NONE;
+        case ARGH__K_SIZE:
+            if ((e = argh__parse_uint(v, SIZE_MAX, &u)) != ARGH_E_NONE)
+                return e;
+            if (write)
+                *(size_t *)o->target = (size_t)u;
             return ARGH_E_NONE;
 #ifndef ARGH_NO_FLOAT
         case ARGH__K_DOUBLE:
@@ -2093,6 +2136,16 @@ extern "C"
         return argh__add(p, s, l, ARGH__K_LONG, target, NULL, help);
     }
 
+    ARGH__DEF argh_opt *argh_uint(argh_parser *p, char s, const char *l, unsigned *target, const char *help)
+    {
+        return argh__add(p, s, l, ARGH__K_UINT, target, NULL, help);
+    }
+
+    ARGH__DEF argh_opt *argh_size(argh_parser *p, char s, const char *l, size_t *target, const char *help)
+    {
+        return argh__add(p, s, l, ARGH__K_SIZE, target, NULL, help);
+    }
+
 #ifndef ARGH_NO_FLOAT
     ARGH__DEF argh_opt *argh_double(argh_parser *p, char s, const char *l, double *target, const char *help)
     {
@@ -2382,6 +2435,10 @@ extern "C"
         case ARGH__K_LONG:
             argh__sb_put(b, "expected an integer");
             break;
+        case ARGH__K_UINT:
+        case ARGH__K_SIZE:
+            argh__sb_put(b, "expected a non-negative integer");
+            break;
         case ARGH__K_DOUBLE:
             argh__sb_put(b, "expected a number");
             break;
@@ -2613,6 +2670,8 @@ extern "C"
         {
         case ARGH__K_INT:
         case ARGH__K_LONG:
+        case ARGH__K_UINT:
+        case ARGH__K_SIZE:
             argh__sb_put(b, "<n>");
             break;
         case ARGH__K_DOUBLE:
@@ -2709,6 +2768,12 @@ extern "C"
             break;
         case ARGH__K_LONG:
             text = argh__fmt_long(num, *(const long *)o->target);
+            break;
+        case ARGH__K_UINT:
+            text = argh__fmt_uint(num, *(const unsigned *)o->target);
+            break;
+        case ARGH__K_SIZE:
+            text = argh__fmt_uint(num, *(const size_t *)o->target);
             break;
 #ifndef ARGH_NO_FLOAT
         case ARGH__K_DOUBLE:

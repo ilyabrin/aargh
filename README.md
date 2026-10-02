@@ -100,6 +100,8 @@ For a program in one file, or a library that ships its own copy of argh.h, `#def
 | `argh_count`  | `ARGH_COUNT`  | `int`          | `-vvv` adds 3                            |
 | `argh_int`    | `ARGH_INT`    | `int`          | `-j4`, `-j 4`, `--jobs=4`, `--jobs 0x10` |
 | `argh_long`   | `ARGH_LONG`   | `long`         | same as `int`                            |
+| `argh_uint`   | `ARGH_UINT`   | `unsigned`     | same as `int`, a minus sign is an error  |
+| `argh_size`   | `ARGH_SIZE`   | `size_t`       | same as `unsigned`                       |
 | `argh_double` | `ARGH_DOUBLE` | `double`       | `--ratio 0.5`, `--ratio=1e-3`            |
 | `argh_string` | `ARGH_STRING` | `const char *` | `-o file`, `-ofile`, `--output=file`     |
 | `argh_enum`   | `ARGH_ENUM`   | `int` (index)  | `--mode fast`                            |
@@ -643,6 +645,8 @@ argh_opt *argh_flag  (argh_parser *p, char s, const char *l, bool *target, const
 argh_opt *argh_count (argh_parser *p, char s, const char *l, int *target, const char *help);
 argh_opt *argh_int   (argh_parser *p, char s, const char *l, int *target, const char *help);
 argh_opt *argh_long  (argh_parser *p, char s, const char *l, long *target, const char *help);
+argh_opt *argh_uint  (argh_parser *p, char s, const char *l, unsigned *target, const char *help);
+argh_opt *argh_size  (argh_parser *p, char s, const char *l, size_t *target, const char *help);
 argh_opt *argh_double(argh_parser *p, char s, const char *l, double *target, const char *help);  /* float */
 argh_opt *argh_string(argh_parser *p, char s, const char *l, const char **target, const char *help);
 argh_opt *argh_enum  (argh_parser *p, char s, const char *l, int *target, const char *const *choices, const char *help);
@@ -683,6 +687,7 @@ ARGH_COUNT(s, l, &int_var, help, ...)        ARGH_ENUM(s, l, &int_var, choices, 
 ARGH_INT(s, l, &int_var, help, ...)          ARGH_LIST(s, l, &values_var, help, ...)
 ARGH_LONG(s, l, &long_var, help, ...)        ARGH_POS(name, &str_var, help, ...)
 ARGH_DOUBLE(s, l, &double_var, help, ...)    ARGH_REST(name, &values_var, help, ...)
+ARGH_UINT(s, l, &unsigned_var, help, ...)    ARGH_SIZE(s, l, &size_var, help, ...)
 ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
 ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
