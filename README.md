@@ -205,6 +205,47 @@ if (argh_given(&p, &jobs))
     printf("jobs set explicitly\n");
 ```
 
+### Optional values
+
+Some options work alone and also take a value, like `--color` and `--color=never`. Put `argh_implicit` right after the option, with the value that the option alone stands for:
+
+<!-- docs-check: source=tests/docs/colortool.c -->
+```c
+argh_metavar(argh_enum(&p, 0, "color", &color, when, "Colorize: never, auto or always"), "<when>");
+argh_implicit(&p, &color, "always");   /* --color alone means --color=always */
+/* or in a table, right after the option: ARGH_IMPLICIT(&color, "always") */
+```
+
+<!-- docs-check: program=colortool -->
+```console
+$ ./tool --help
+Usage: tool [OPTIONS] [files...]
+
+Arguments:
+  [files...]            Files to show
+
+Options:
+      --color[=<when>]  Colorize: never, auto or always (default: auto)
+
+  -h, --help            Print help
+
+$ ./tool --color
+color=always files=0
+
+$ ./tool --color=never
+color=never files=0
+
+$ ./tool --color a.txt
+color=always files=1
+
+$ ./tool
+color=auto files=0
+```
+
+- **A value needs `=`.** In `--color a.txt`, `a.txt` is a file, not the value: otherwise adding a value to an option would change what the arguments after it mean. A short name (`-c`) works only alone, like a flag, and can be combined: `-cv`.
+- The option needs a long name, so that a value can still be given. Without `NDEBUG` argh checks this, that the entry comes right after its option, and that the option accepts the value.
+- `--color` alone counts as given for `argh_given`, required options and rules. A value from the environment is an ordinary value.
+
 ### Environment variables
 
 Let an option fall back to an environment variable, the way tools take settings in containers and CI:
@@ -572,7 +613,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.2 to 9.5 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.3 to 9.6 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -657,6 +698,7 @@ argh_opt *argh_custom(argh_parser *p, char s, const char *l, void *target, const
 argh_opt *argh_group (argh_parser *p, const char *title);
 argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  /* checked without NDEBUG */
 argh_opt *argh_env    (argh_parser *p, void *target, const char *name);          /* fallback for target's option */
+argh_opt *argh_implicit(argh_parser *p, void *target, const char *value);      /* right after it: value optional */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -692,6 +734,7 @@ ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
 ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
 ARGH_ENV(&var, name)                         /* environment variable for var's option */
+ARGH_IMPLICIT(&var, value)                   /* right after var's option: --name alone means --name=value */
 
 /* Commands, in a table ending with ARGH_CMD_END (commands) */
 ARGH_CMD(name, help, options[, handler[, flags]])   /* flags: ARGH_POSIX */
@@ -709,7 +752,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.4.0" */
+ARGH_VERSION          /* "1.5.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -823,7 +866,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.2 to 11.4 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.3 to 11.6 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks

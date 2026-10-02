@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-10-03
+
+### Added
+
+- Optional values: `argh_implicit(&p, &color, "always")` or `ARGH_IMPLICIT(&color, "always")` right after an option. `--color` alone means `--color=always`; a value needs `=` (`--color=never`), so in `--color a.txt` the file stays a positional. A short name works alone, like a flag (`-cv`). Help shows `--color[=<when>]`. Without `NDEBUG` argh checks that the entry follows a value option with a long name and that the option accepts the value. Costs about 120 bytes on firmware and nothing in parse time.
+
 ## [1.4.0] - 2026-10-03
 
 ### Added
@@ -184,7 +190,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/ilyabrin/argh/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ilyabrin/argh/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ilyabrin/argh/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ilyabrin/argh/compare/v1.1.0...v1.2.0

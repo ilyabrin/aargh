@@ -2921,6 +2921,157 @@ TEST(test_parser_size)
     ASSERT_TRUE(sizeof(argh_parser) - builder < 256);
 }
 
+/* ============================================================================
+ * Optional values (ARGH_IMPLICIT)
+ * ============================================================================ */
+
+static const char *const im_modes[] = {"never", "auto", "always", NULL};
+static int im_color;
+static bool im_verbose;
+static argh_values im_rest;
+static const argh_opt im_opts[] = {
+    ARGH_ENUM('c', "color", &im_color, im_modes, "Colorize output"),
+    ARGH_IMPLICIT(&im_color, "always"),
+    ARGH_ENV(&im_color, "TOOL_COLOR"),
+    ARGH_FLAG('v', "verbose", &im_verbose, "Verbose"),
+    ARGH_REST("files", &im_rest, "Files"),
+    ARGH_END,
+};
+
+static argh_parser im_p;
+
+static bool im_parse(int argc, char **argv)
+{
+    im_color = 1;
+    im_verbose = false;
+    memset(&im_rest, 0, sizeof(im_rest));
+    setup(&im_p);
+    argh_table(&im_p, im_opts);
+    return argh_parse(&im_p, argc, argv);
+}
+
+TEST(test_implicit_long)
+{
+    {
+        ARGV("--color");
+        ASSERT_TRUE(im_parse(argc, argv));
+        ASSERT_EQ(im_color, 2);
+    }
+    {
+        ARGV("--color=never");
+        ASSERT_TRUE(im_parse(argc, argv));
+        ASSERT_EQ(im_color, 0);
+    }
+    {
+        ARGV0();
+        ASSERT_TRUE(im_parse(argc, argv));
+        ASSERT_EQ(im_color, 1); /* the default, not the implicit value */
+    }
+}
+
+TEST(test_implicit_next_argument_is_positional)
+{
+    ARGV("--color", "never");
+    ASSERT_TRUE(im_parse(argc, argv));
+    ASSERT_EQ(im_color, 2);
+    ASSERT_EQ(im_rest.count, 1);
+    ASSERT_STR_EQ(im_rest.items[0], "never");
+}
+
+TEST(test_implicit_short)
+{
+    {
+        ARGV("-cv");
+        ASSERT_TRUE(im_parse(argc, argv));
+        ASSERT_EQ(im_color, 2);
+        ASSERT_TRUE(im_verbose);
+    }
+    {
+        ARGV("-c", "never");
+        ASSERT_TRUE(im_parse(argc, argv));
+        ASSERT_EQ(im_color, 2);
+        ASSERT_EQ(im_rest.count, 1);
+    }
+}
+
+TEST(test_implicit_bad_value)
+{
+    ARGV("--color=sometimes");
+    ASSERT_FALSE(im_parse(argc, argv));
+    ASSERT_STR_EQ(error_text(&im_p),
+                  "invalid value 'sometimes' for '--color': expected one of: never, auto, always");
+}
+
+TEST(test_implicit_env)
+{
+    ARGV0();
+    reset_output();
+    set_env("TOOL_COLOR", "never");
+    {
+        static argh_parser p;
+        im_color = 1;
+        setup(&p);
+        argh_table(&p, im_opts);
+        ASSERT_TRUE(argh_parse(&p, argc, argv));
+        ASSERT_EQ(im_color, 0);
+    }
+}
+
+TEST(test_implicit_builder_and_help)
+{
+    ARGV("--level");
+    int level = 0;
+    int width = 0;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'l', "level", &level, "Compression level");
+    argh_implicit(&p, &level, "6");
+    argh_metavar(argh_int(&p, 0, "width", &width, "Width"), "<cols>");
+    argh_implicit(&p, &width, "80");
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(level, 6);
+    ASSERT_TRUE(argh_given(&p, &level));
+    ASSERT_FALSE(argh_given(&p, &width));
+
+    argh_print_help(&p);
+    ASSERT_TRUE(strstr(out_text, "  -l, --level[=<n>]     Compression level (default: 6)\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "      --width[=<cols>]") != NULL);
+}
+
+#ifndef NDEBUG
+static argh_err implicit_config(const argh_opt *opts, const char **detail)
+{
+    ARGV0();
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, opts);
+    argh_parse(&p, argc, argv);
+    *detail = error_text(&p);
+    return argh_last_error(&p)->code;
+}
+
+TEST(test_implicit_config_errors)
+{
+    static int mode, n;
+    static bool flag;
+    static const argh_opt typo[] = {ARGH_ENUM(0, "color", &mode, im_modes, ""), ARGH_IMPLICIT(&mode, "alwys"), ARGH_END};
+    static const argh_opt on_flag[] = {ARGH_FLAG(0, "force", &flag, ""), ARGH_IMPLICIT(&flag, "yes"), ARGH_END};
+    static const argh_opt short_only[] = {ARGH_INT('n', NULL, &n, ""), ARGH_IMPLICIT(&n, "1"), ARGH_END};
+    static const argh_opt unbound[] = {ARGH_IMPLICIT(&n, "1"), ARGH_END};
+    static const argh_opt apart[] = {ARGH_INT(0, "num", &n, ""), ARGH_FLAG(0, "force", &flag, ""), ARGH_IMPLICIT(&n, "1"), ARGH_END};
+    const char *text;
+
+    ASSERT_EQ(implicit_config(typo, &text), ARGH_E_CONFIG);
+    ASSERT_STR_EQ(text, "configuration error: ARGH_IMPLICIT value is not valid for its option (--color)");
+    ASSERT_EQ(implicit_config(on_flag, &text), ARGH_E_CONFIG);
+    ASSERT_TRUE(strstr(text, "ARGH_IMPLICIT must directly follow a value option") != NULL);
+    ASSERT_EQ(implicit_config(short_only, &text), ARGH_E_CONFIG);
+    ASSERT_EQ(implicit_config(unbound, &text), ARGH_E_CONFIG);
+    ASSERT_EQ(implicit_config(apart, &text), ARGH_E_CONFIG);
+}
+#endif
+
 /* ============================================================================ */
 
 int main(void)
@@ -3136,6 +3287,15 @@ int main(void)
 #endif
 #ifndef NDEBUG
     RUN_TEST(test_env_not_used_by_examples);
+#endif
+    RUN_TEST(test_implicit_long);
+    RUN_TEST(test_implicit_next_argument_is_positional);
+    RUN_TEST(test_implicit_short);
+    RUN_TEST(test_implicit_bad_value);
+    RUN_TEST(test_implicit_env);
+    RUN_TEST(test_implicit_builder_and_help);
+#ifndef NDEBUG
+    RUN_TEST(test_implicit_config_errors);
 #endif
 #if ARGH_HELP_WIDTH == 80
     RUN_TEST(test_help_wraps_at_80);
