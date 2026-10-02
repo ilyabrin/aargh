@@ -1,6 +1,6 @@
 # Examples
 
-Three programs, from a five-minute tool to a multi-file application. Each one is a real kind of tool, and together they use every feature of argh.h.
+Three programs, from a five-minute tool to a multi-file application. Each one is a real kind of tool, and together they use most of argh.h: every option type except `long` and `double`, tables, commands, custom types, rules and a validator.
 
 ```sh
 make examples   # build all three
@@ -17,13 +17,13 @@ make smoke      # run them and check their output (CI does this on every push)
 
 ## wc: the basics
 
-About 40 lines of argh code, and it counts the same as the real `wc`.
+Eight lines of argh code, and it counts the same as the real `wc`.
 
 ```console
 $ ./wc LICENSE SECURITY.md
       21     169    1087 LICENSE
-      33     152    1030 SECURITY.md
-      54     321    2117 total
+      33     147     998 SECURITY.md
+      54     316    2085 total
 
 $ ./wc --line LICENSE
 wc: unknown option '--line' (did you mean '--lines'?)
@@ -73,14 +73,14 @@ TLS:
 
 $ ./logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem --chunk 1K --gzip -vv -x bench LICENSE SECURITY.md bench/size.sh
   send  LICENSE: 1087 bytes in 2 requests
-  send  SECURITY.md: 1030 bytes in 2 requests
+  send  SECURITY.md: 998 bytes in 1 request
   skip  bench/size.sh (excluded)
-Plan: 2 files, 2117 bytes in 4 requests to logs.example.com:6514
+Plan: 2 files, 2085 bytes in 3 requests to logs.example.com:6514
       format json, gzip, TLS
       timeout 30s (default), 3 attempts
 ```
 
-Every mistake gets a precise message and exit code 2:
+Every mistake gets a precise message and exit code 2. The first line of each, a `Try 'logship --help'` hint follows:
 
 ```console
 logship: missing required option '--to'
@@ -154,15 +154,19 @@ Rules and the validator mix global and command options, and know which command r
 ```console
 $ ./pkg instal left-pad
 pkg: unknown command 'instal' (did you mean 'install'?)
+Try 'pkg --help' for more information.
 
 $ ./pkg install x --version 1.02
 pkg: invalid value '1.02' for '--version': each part of a version must be a number without leading zeros
+Try 'pkg install --help' for more information.
 
 $ ./pkg install -D -O x
 pkg: options '--dev' and '--optional' cannot be used together
+Try 'pkg install --help' for more information.
 
 $ ./pkg --offline remote add o https://u
 pkg: 'remote add' needs the network; drop --offline
+Try 'pkg remote add --help' for more information.
 
 $ ./pkg remote
 pkg: 'remote' needs a command

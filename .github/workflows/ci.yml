@@ -74,6 +74,9 @@ jobs:
           test_argh.exe || exit /b 1
           cl /nologo /W4 /std:c11 tests\nostdio_check.c /Fe:nostdio_check.exe || exit /b 1
           nostdio_check.exe || exit /b 1
+          cl /nologo /W4 /WX /std:c11 tests\static_check.c tests\static_check_other.c /Fe:static_check.exe || exit /b 1
+          static_check.exe -v || exit /b 1
+          cl /nologo /std:c11 tests\settings_main.c tests\settings_impl.c /Fe:settings_mismatch.exe >nul 2>&1 && (echo FAIL: files with different settings linked & exit /b 1) || echo files with different settings: rejected at link time
           cl /nologo /W4 /std:c11 /DFUZZ_REPLAY tests\fuzz_argh.c /Fe:fuzz_replay.exe || exit /b 1
           for %%f in (tests\fuzz\*) do fuzz_replay.exe %%f || exit /b 1
           cl /nologo /W4 /WX /std:c++17 /EHsc tests\cxx_check.cpp /Fe:cxx_check.exe || exit /b 1

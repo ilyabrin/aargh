@@ -19,7 +19,7 @@
 static char out[2048];
 static size_t out_len;
 
-static void to_buffer(void *ctx, int to_stderr, const char *text, size_t len)
+static void to_buffer(void *ctx, bool to_stderr, const char *text, size_t len)
 {
     (void)ctx;
     (void)to_stderr;

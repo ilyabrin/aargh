@@ -123,7 +123,7 @@ static bool validate(argh_parser *p, void *ctx)
 /* Output sink: checks that every write is plain text */
 static size_t out_bytes;
 
-static void sink(void *ctx, int to_stderr, const char *text, size_t len)
+static void sink(void *ctx, bool to_stderr, const char *text, size_t len)
 {
     (void)ctx;
     (void)to_stderr;

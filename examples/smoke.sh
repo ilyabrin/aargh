@@ -53,6 +53,7 @@ check 2 "'--gzip' and '--zstd' cannot"     $LOGSHIP --to x:1 --gzip --zstd LICEN
 check 2 "'--tls-key' requires '--tls-cert'" $LOGSHIP --to x:1 --tls-key k LICENSE
 check 2 "must not be larger than --max-size" $LOGSHIP --to x:1 --chunk 128M LICENSE
 check 2 "one of '<files>' or '--stdin'"    $LOGSHIP --to x:1
+check 2 "did you mean '--format'"         $LOGSHIP --to x:1 --fromat raw LICENSE
 
 # --- pkg --------------------------------------------------------------------
 check 0 "+ left-pad ^1.3.0 (dev)"          $PKG install left-pad --version ^1.3 --dev

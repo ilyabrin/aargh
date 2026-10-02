@@ -73,7 +73,7 @@ static void reset_output(void)
     out_text[0] = err_text[0] = '\0';
 }
 
-static void capture(void *ctx, int to_stderr, const char *text, size_t len)
+static void capture(void *ctx, bool to_stderr, const char *text, size_t len)
 {
     char *buf = to_stderr ? err_text : out_text;
     size_t *used = to_stderr ? &err_len : &out_len;

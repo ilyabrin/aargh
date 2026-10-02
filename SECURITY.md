@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-argh.h is in early development. Only the latest release receives fixes.
+Only the latest release receives fixes.
 
 | Version | Supported |
 | ------- | --------- |
-| 0.1.x   | Yes       |
-| < 0.1   | No        |
+| 1.0.x   | Yes       |
+| < 1.0   | No        |
 
 ## Reporting a vulnerability
 

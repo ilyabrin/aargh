@@ -1,0 +1,186 @@
+# argh.h
+
+> Single-header command-line argument parser for C99 (also compiles as C++). Options are bound to your variables and written directly into them. No heap allocations, no global state, option tables can be `static const`. Built-in help, version, error messages with "did you mean" suggestions, nested commands, rules between options, custom value types. Runs on microcontrollers (about 11 KB of flash on a Cortex-M0 without stdio and floating point). MIT license.
+
+This file is a guide for coding agents: how to add argh.h to a project and use it correctly. Everything below matches the current `argh.h`; when in doubt, the header is the source of truth.
+
+## Setup
+
+- Copy `argh.h` into the project. No build system changes, no dependencies.
+- In exactly one `.c` file: `#define ARGH_IMPLEMENTATION` before `#include "argh.h"`. Other files include it without the define.
+- Or, for a one-file program or a library that embeds its own copy: `#define ARGH_STATIC` before the include. That includes the implementation and makes every function `static`.
+- Settings (`ARGH_BUILDER_CAP`, `ARGH_MAX_OPTS`, `ARGH_MAX_TABLES`, `ARGH_MAX_DEPTH`, `ARGH_NO_COMMANDS`) must be identical in every file that includes argh.h; set them with compiler flags such as `-DARGH_BUILDER_CAP=8`, as plain numbers. A mismatch is a link error mentioning `argh_init_settings_...`: fix the settings, don't work around it.
+
+## Minimal program
+
+```c
+#include <stdio.h>
+
+#define ARGH_IMPLEMENTATION
+#include "argh.h"
+
+int main(int argc, char **argv)
+{
+    bool verbose = false;          /* the initial value is the default */
+    int jobs = 4;
+    const char *output = "out.txt";
+    const char *input = NULL;
+
+    argh_parser p;
+    argh_init(&p, "mytool", "Converts things");
+    argh_version(&p, "1.0.0");     /* enables -V/--version */
+    argh_flag(&p, 'v', "verbose", &verbose, "Verbose output");
+    argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
+    argh_string(&p, 'o', "output", &output, "Output file");
+    argh_pos(&p, "input", &input, "Input file");
+
+    if (!argh_parse(&p, argc, argv))
+        return argh_exit_code(&p); /* help or version printed: 0; error printed: 2 */
+
+    printf("%d %d %s %s\n", verbose, jobs, output, input);
+    return 0;
+}
+```
+
+## Rules that are easy to get wrong
+
+- Always write `if (!argh_parse(...)) return argh_exit_code(&p);`. argh has already printed help, the version or the error; do not print anything else.
+- Defaults are the initial values of the variables. There is no default parameter.
+- There is nothing to free. The parser can live on the stack.
+- `argh_parse` reorders `argv` in place: positional arguments move to the front. Strings stored in your variables point into `argv`, so `argv` must outlive their use (it always does in `main`).
+- Short name `0` means no short option; long name `NULL` means no long option.
+- Enum choices are a NULL-terminated array: `static const char *const modes[] = {"fast", "safe", NULL};`. The variable receives the index.
+- Lists need storage: `const char *buf[16]; argh_values inc = ARGH_VALUES(buf);`. `argh_rest` needs none: `argh_values files = {0};`.
+- Variable types must match: `bool` for flags, `int` for count/int/enum, `long`, `double`, `const char *` for strings and positionals, `argh_values` for lists and rest.
+- `-h`/`--help` are reserved (and `-V`/`--version` after `argh_version`). To use `-h` for something else, call `argh_set_flags(&p, ARGH_NO_AUTO_HELP)`.
+- `argh_set_flags` replaces the flags: pass them all at once, `ARGH_POSIX | ARGH_NO_AUTO_HELP`.
+- Strict parsing: `-o=file` is an error (use `-o file` or `--output=file`), no prefix matching, `010` is decimal ten, hex needs `0x`, a negative number alone like `-5` is an unknown option unless it follows an option that takes a value or comes after `--`.
+- A program with commands can't have positional arguments of its own; positionals belong to the commands.
+- Build with `-DNDEBUG` for release: definition checks (duplicate names, command tree, rule variables) run only in debug builds and cost about 1.6 µs.
+
+## Option types
+
+| Builder       | Table macro   | Variable       |
+| ------------- | ------------- | -------------- |
+| `argh_flag`   | `ARGH_FLAG`   | `bool`         |
+| `argh_count`  | `ARGH_COUNT`  | `int`          |
+| `argh_int`    | `ARGH_INT`    | `int`          |
+| `argh_long`   | `ARGH_LONG`   | `long`         |
+| `argh_double` | `ARGH_DOUBLE` | `double`       |
+| `argh_string` | `ARGH_STRING` | `const char *` |
+| `argh_enum`   | `ARGH_ENUM`   | `int` (index)  |
+| `argh_list`   | `ARGH_LIST`   | `argh_values`  |
+| `argh_pos`    | `ARGH_POS`    | `const char *` |
+| `argh_rest`   | `ARGH_REST`   | `argh_values`  |
+| `argh_custom` | `ARGH_CUSTOM` | anything       |
+
+Builder calls return `argh_opt *`, and modifiers take and return it: `argh_required`, `argh_optional` (positionals), `argh_hidden`, `argh_negatable` (flags: adds `--no-name`), `argh_once`, `argh_metavar(opt, "<file>")`. Example: `argh_required(argh_string(&p, 'o', "output", &output, "Output file"));`
+
+`argh_given(&p, &variable)` tells whether the option was on the command line.
+
+## Option tables
+
+Use tables for many options or to keep definitions in read-only memory. Tables and builder calls can be mixed; `argh_table` can be called several times.
+
+```c
+static struct { bool verbose; int port; const char *host; } cfg = {false, 5432, "localhost"};
+
+static const argh_opt options[] = {
+    ARGH_FLAG('v', "verbose", &cfg.verbose, "Verbose output"),
+    ARGH_GROUP("Database"),
+    ARGH_STRING(0, "db-host", &cfg.host, "Database host", ARGH_REQUIRED),
+    ARGH_INT(0, "db-port", &cfg.port, "Database port", 0, "<port>"),
+    ARGH_END
+};
+
+argh_table(&p, options);
+```
+
+After the help text a table macro takes two optional arguments: flags (`ARGH_REQUIRED | ARGH_ONCE | ARGH_HIDDEN | ARGH_NEGATABLE | ARGH_OPTIONAL`), then a value name for help. A value name needs flags before it (`0` for none).
+
+## Commands
+
+```c
+static bool release;
+static const char *name, *url;
+
+static int run_build(argh_parser *p, void *app) { (void)p; (void)app; return 0; }
+
+static const argh_opt build_opts[] = { ARGH_FLAG('r', "release", &release, "Optimized build"), ARGH_END };
+static const argh_opt add_opts[] = {
+    ARGH_POS("name", &name, "Remote name"),
+    ARGH_POS("url", &url, "Remote URL"),
+    ARGH_END
+};
+static const argh_cmd remote_cmds[] = { ARGH_CMD("add", "Add a remote", add_opts), ARGH_CMD_END };
+static const argh_cmd commands[] = {
+    ARGH_CMD("build", "Build the project", build_opts, run_build),
+    ARGH_CMD_GROUP("remote", "Manage remotes", remote_cmds),
+    ARGH_CMD_END
+};
+
+/* in main, after argh_init and global options: */
+argh_commands(&p, commands);
+if (!argh_parse(&p, argc, argv))
+    return argh_exit_code(&p);
+return argh_run(&p, NULL);   /* calls the selected command's handler; or switch on argh_command(&p) */
+```
+
+- `ARGH_CMD(name, help, options[, handler[, flags]])`; pass `NULL` for no options. With flags `ARGH_POSIX`, options end at the command's first positional, so `tool exec prog --flag` passes `--flag` to `prog`.
+- Options added to the parser itself are global and work before and after the command name.
+- `tool help <command>` and `tool <command> --help` work automatically.
+
+## Rules and validation
+
+```c
+static const argh_rule rules[] = {
+    ARGH_AT_MOST_ONE(&json, &yaml),       /* no two together */
+    ARGH_EXACTLY_ONE(&input, &use_stdin), /* one and only one */
+    ARGH_AT_LEAST_ONE(&a, &b),            /* one or more */
+    ARGH_REQUIRES(&tls_key, &tls_cert),   /* the first needs all the others */
+    ARGH_RULES_END
+};
+argh_rules(&p, rules);
+```
+
+Rules name 2 to 4 variables that are bound to options. For anything else, a validator runs after all other checks: `argh_set_validator(&p, fn, ctx)` with `bool fn(argh_parser *p, void *ctx)` returning `true`, or `argh_fail(p, "message")` (the message must outlive the parser; use a string literal).
+
+## Custom types
+
+```c
+static const char *parse_port(const char *text, void *target)
+{
+    char *end;
+    long v = strtol(text, &end, 10);
+    if (end == text || *end || v < 1 || v > 65535)
+        return "expected a port from 1 to 65535";  /* shown in the error */
+    *(int *)target = (int)v;
+    return NULL;                                   /* NULL means success */
+}
+static const argh_type port_type = {"<port>", parse_port, NULL};  /* third: optional format for defaults */
+
+argh_custom(&p, 'p', "port", &port, &port_type, "Port to listen on");
+```
+
+## Errors and output
+
+- `argh_last_error(&p)` returns `const argh_error *` with `code` (`ARGH_E_*`, values are stable), `argv_index`, `opt`, `value`, `detail`, `suggestion`, `rule`, `short_name`.
+- `argh_format_error(&p, buf, size)` formats the message without stdio and returns the full length, like `snprintf`.
+- `argh_set_writer(&p, fn, ctx)` redirects all output: `void fn(void *ctx, bool to_stderr, const char *text, size_t len)`.
+- `argh_print_help(&p)` prints help on demand.
+
+## Build options
+
+- `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST`: remove commands or suggestions for smaller code.
+- `ARGH_NO_STDIO`: no `<stdio.h>`; output goes only to the writer. For firmware.
+- `ARGH_NO_FLOAT`: removes `argh_double`, so `strtod` is not linked (saves about 27 KB on newlib firmware).
+- `ARGH_BUILDER_CAP` (32), `ARGH_MAX_OPTS` (64), `ARGH_MAX_TABLES` (8), `ARGH_MAX_DEPTH` (4): capacities.
+- `ARGH_VERSION_MAJOR`, `ARGH_VERSION_MINOR`, `ARGH_VERSION_PATCH`, `ARGH_VERSION`: the version of argh.h.
+
+## Docs
+
+- [README](https://github.com/ilyabrin/argh/blob/main/README.md): full guide and API reference
+- [argh.h](https://raw.githubusercontent.com/ilyabrin/argh/main/argh.h): the library; the header part documents every function
+- [Examples](https://github.com/ilyabrin/argh/tree/main/examples): wc (basics), logship (tables, custom types, rules), pkg (commands over several files)
+- [BENCHMARKS.md](https://github.com/ilyabrin/argh/blob/main/BENCHMARKS.md): speed, memory and code size
+- [CHANGELOG.md](https://github.com/ilyabrin/argh/blob/main/CHANGELOG.md): changes between versions

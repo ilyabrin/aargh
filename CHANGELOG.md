@@ -2,9 +2,36 @@
 
 All notable changes to argh.h are listed here.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/). Until v1.0, minor versions (0.x) may change the API.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/). Since v1.0, breaking changes only come with a new major version.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-10-02
+
+The first stable release: the API is frozen and follows Semantic Versioning. See [Upgrading from 0.4](README.md#upgrading-from-04) for the three breaking changes.
+
+### Added
+
+- `ARGH_VERSION_MAJOR`, `ARGH_VERSION_MINOR`, `ARGH_VERSION_PATCH` and `ARGH_VERSION`, to check the version at compile time.
+- [ARCHITECTURE.md](ARCHITECTURE.md): how argh.h is organized, how a parse runs, the techniques behind it, the design decisions and the project's history.
+- [COMPARISON.md](COMPARISON.md): argh compared with getopt_long, cargs and argparse in features, behavior on tricky input, speed and size, reproducible with `bench/compare/compare.sh`.
+- [llms.txt](llms.txt): a guide for coding agents, with the setup, the rules that are easy to get wrong and every feature in short.
+- `ARGH_STATIC`: includes the implementation and makes every function `static`, for one-file programs and libraries that embed their own copy.
+
+### Changed
+
+- Parsing is 10% to 18% faster: the checks for names reserved by `--help` and `--version` compare the first letter before calling `strcmp`, and `argh_init` no longer clears the builder storage, which builder calls fill in themselves.
+
+### Changed (breaking)
+
+- `argh_write_fn` takes `bool to_stderr` instead of `int`. Change the parameter type in your writer.
+- `ARGH_K_*`, `ARGH_R_*`, `enum argh_kind` and `enum argh_rule_kind` are internal now (`ARGH__K_*`, `ARGH__R_*`). Code that uses the macros and functions is not affected.
+- `argh_init` is a macro for a function whose name encodes the size settings (`ARGH_BUILDER_CAP`, `ARGH_MAX_OPTS`, `ARGH_MAX_TABLES`, `ARGH_MAX_DEPTH`, `ARGH_NO_COMMANDS`). Files that include argh.h with different settings now fail to link instead of corrupting memory at run time. Calls stay the same; the settings must be plain numbers.
+
+### Documented
+
+- Error code values are stable: new codes are only added at the end.
+- `argh_set_flags` replaces the flags set before.
 
 ## [0.4.0] - 2026-09-26
 
@@ -107,7 +134,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/ilyabrin/argh/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ilyabrin/argh/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ilyabrin/argh/compare/v0.2.0...v0.3.0

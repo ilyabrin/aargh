@@ -35,10 +35,14 @@ PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c exam
 
 all: test_argh$(EXE) $(EXAMPLES)
 
-test: test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE)
+test: test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) static_check$(EXE)
 	./test_argh$(EXE)
 	./nostdio_check$(EXE)
+	./static_check$(EXE) -v
 	./fuzz_replay$(EXE) tests/fuzz/*
+	@if $(CC) $(CFLAGS) -o settings_mismatch$(EXE) tests/settings_main.c tests/settings_impl.c >/dev/null 2>&1; \
+	then echo "FAIL: files with different settings linked"; exit 1; \
+	else echo "files with different settings: rejected at link time"; fi
 
 test_argh$(EXE): tests/test_argh.c argh.h
 	$(CC) $(CFLAGS) -o $@ tests/test_argh.c $(LDFLAGS)
@@ -46,6 +50,10 @@ test_argh$(EXE): tests/test_argh.c argh.h
 # argh.h built without <stdio.h>, as firmware would use it
 nostdio_check$(EXE): tests/nostdio_check.c argh.h
 	$(CC) $(CFLAGS) -o $@ tests/nostdio_check.c $(LDFLAGS)
+
+# Two private copies of argh.h with ARGH_STATIC in one program
+static_check$(EXE): tests/static_check.c tests/static_check_other.c argh.h
+	$(CC) $(CFLAGS) -o $@ tests/static_check.c tests/static_check_other.c $(LDFLAGS)
 
 # The fuzz target run once on each saved input, with any compiler
 fuzz_replay$(EXE): tests/fuzz_argh.c argh.h
@@ -88,4 +96,4 @@ cxx: tests/cxx_check.cpp argh.h
 	$(CXX) -std=c++11 -Wall -Wextra -Wpedantic -Werror -o cxx_check$(EXE) tests/cxx_check.cpp
 
 clean:
-	-$(RM) $(call fixpath,test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) bench_parse$(EXE) cxx_check$(EXE) $(EXAMPLES))
+	-$(RM) $(call fixpath,test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) static_check$(EXE) bench_parse$(EXE) cxx_check$(EXE) $(EXAMPLES))

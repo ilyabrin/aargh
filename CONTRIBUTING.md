@@ -4,12 +4,14 @@ Thanks for helping! Bug reports, test cases, docs fixes and code are all welcome
 
 ## Before you start
 
-argh.h is in early development (0.x), and the API can still change. Subcommands and custom value types are planned for v0.3, and a reduced build for microcontrollers for v0.4. Because of that:
+Since v1.0 the API is stable and follows Semantic Versioning, so breaking changes wait for v2.0. Because of that:
 
 - **Bug fixes, tests, docs and portability fixes:** open a pull request directly.
 - **New features or API changes:** please open an issue first. The feature may already be planned, or it may need a different shape. A short discussion saves you from writing code that has to be redone.
 
 Found a security problem? Don't open an issue, see [SECURITY.md](SECURITY.md).
+
+Before larger changes, [ARCHITECTURE.md](ARCHITECTURE.md) explains how the code is organized, how a parse runs and why the design is the way it is.
 
 ## Build and test
 
@@ -25,7 +27,7 @@ make clean
 
 Use a different compiler with `make CC=clang test`.
 
-CI runs the same commands on Linux (GCC, Clang, plus AddressSanitizer and UndefinedBehaviorSanitizer), macOS (Clang) and Windows (MinGW, MSVC). If you can, run the sanitizers locally before sending a change that touches parsing:
+CI runs the same commands on Linux (GCC, Clang, plus AddressSanitizer and UndefinedBehaviorSanitizer and 2 minutes of fuzzing), macOS (Clang) and Windows (MinGW, MSVC), and checks the firmware size on ARM (`make size-arm`). If you can, run the sanitizers locally before sending a change that touches parsing:
 
 ```sh
 make CC=clang test CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g -fsanitize=address,undefined"
@@ -38,7 +40,7 @@ For parsing changes, also fuzz for a few minutes: `make fuzz FUZZ_TIME=300` (nee
 - **One topic per PR.** A bug fix and a refactor are two PRs.
 - **A test for every behavior change.** For a bug fix, add a test that fails without the fix. Tests live in [tests/test_argh.c](tests/test_argh.c) and use the `TEST` / `RUN_TEST` / `ASSERT_*` macros at the top of the file.
 - **CI is green.** The build uses `-Werror` on GCC and Clang, so a warning is a failure.
-- **Docs follow the code.** If you change behavior, update [README.md](README.md). Performance changes should also update [BENCHMARKS.md](BENCHMARKS.md).
+- **Docs follow the code.** If you change behavior, update [README.md](README.md) and [llms.txt](llms.txt). Performance changes should also update [BENCHMARKS.md](BENCHMARKS.md).
 - **A line in [CHANGELOG.md](CHANGELOG.md)** under `Unreleased` for anything a user would notice.
 
 ## Code rules

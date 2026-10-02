@@ -17,7 +17,7 @@
 /* Stand-in for a UART data register */
 static volatile char uart;
 
-static void uart_write(void *ctx, int to_stderr, const char *text, size_t len)
+static void uart_write(void *ctx, bool to_stderr, const char *text, size_t len)
 {
     (void)ctx;
     (void)to_stderr;

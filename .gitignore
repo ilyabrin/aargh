@@ -54,6 +54,7 @@ desktop.ini
 /bench_parse
 /cxx_check
 /nostdio_check
+/static_check
 /fuzz_replay
 /fuzz_argh
 /fuzz_corpus/
