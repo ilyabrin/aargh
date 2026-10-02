@@ -9,11 +9,11 @@ make smoke      # run them and check their output (CI does this on every push)
 
 The commands below run in this directory. [data/](data) holds small sample logs, so the output is the same on every system; `make docs-check` compares it with the real programs.
 
-| Example                    | What it is                                  | What it shows                                                                                   |
-| -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [wc.c](wc.c)               | Counts lines, words and bytes, like `wc`    | Flags, a file list, `--help` and `--version` for free, examples in help                         |
-| [logship.c](logship.c)     | Sends log files to a collector              | An option table, help groups, custom types, enums, lists, rules, a validator, `argh_given`, an environment variable |
-| [pkg/](pkg)                | A package manager front end, like `cargo`   | Commands over several files, global options, handlers with a context, a version type, pass-through|
+| Example                | What it is                                | What it shows                                                                                                       |
+| ---------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| [wc.c](wc.c)           | Counts lines, words and bytes, like `wc`  | Flags, a file list, `--help` and `--version` for free, examples in help                                             |
+| [logship.c](logship.c) | Sends log files to a collector            | An option table, help groups, custom types, enums, lists, rules, a validator, `argh_given`, an environment variable |
+| [pkg/](pkg)            | A package manager front end, like `cargo` | Commands over several files, global options, handlers with a context, a version type, pass-through                  |
 
 `logship` and `pkg` are dry runs: they do all the checking a real tool would do, then print what they would do instead of touching the network.
 
