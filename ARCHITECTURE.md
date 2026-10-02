@@ -151,7 +151,7 @@ The full design notes, including alternatives that were rejected, are kept by th
 - **Sanitizers and fuzzing:** every pull request runs the tests under ASan and UBSan and fuzzes `argh_parse` for 2 minutes with libFuzzer. The fuzz target checks invariants: `argv` is only reordered, stored strings point into `argv`, error messages are consistent at every buffer size.
 - **Examples as tests:** `make smoke` runs the three example programs and checks their output.
 - **Budgets:** CI fails if the firmware build grows past 12 KB (10 KB reduced) on Cortex-M0 or M4.
-- **Platforms:** Linux (GCC, Clang), macOS (Clang), Windows (MinGW, MSVC), ARM (arm-none-eabi-gcc).
+- **Platforms:** Linux x86-64 and ARM64 (GCC, Clang), macOS ARM64 (Clang), Windows (MinGW, MSVC), 32-bit x86, and under qemu 32-bit ARM and big-endian s390x and PowerPC, so both byte orders and both word sizes run the full test suite. Firmware is built for Cortex-M0 and M4 (arm-none-eabi-gcc).
 - **Docs:** for v1.0, every console example in the READMEs was checked against real output, and every public name against the header.
 
 ## History
