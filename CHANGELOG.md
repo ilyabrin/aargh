@@ -6,12 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-02
+
 ### Added
 
 - Environment variables: `argh_env(&p, &jobs, "TOOL_JOBS")` or `ARGH_ENV(&jobs, "TOOL_JOBS")` in a table. When the command line doesn't set the option, its value comes from the variable, checked like a command-line value; it counts as given for required options, `argh_given` and rules. Help shows `[env: TOOL_JOBS]`, errors name the variable (`invalid value 'x' in TOOL_JOBS for '--jobs'`), and a missing required option says `(or set TOOL_TOKEN)`.
 - `ARGH_GETENV(name)` decides how variables are read: `getenv` by default; redefine it to read from elsewhere or to fake the environment in tests. With `ARGH_NO_STDIO` there is no environment unless it is defined, so firmware doesn't pull in `getenv`.
 - The logship and pkg examples take `LOGSHIP_TO` and `PKG_REGISTRY`.
-- Cost: about 1 KB of code on a desktop (Linux GCC, release), whether or not a program uses it; about 12 bytes on firmware, which has no environment.
+- Cost: about 1 KB of code on a desktop (Linux GCC, release), whether or not a program uses it; about 12 bytes on firmware built with `ARGH_NO_STDIO`, which has no environment. Firmware that keeps stdio links newlib's `getenv` too (about 1 KB more); define `ARGH_GETENV(name)` as `NULL` there to leave it out.
+
+### Fixed
+
+- Programs built with MSVC `/W4 /WX` failed on the deprecation warning for `getenv` (C4996); argh.h now silences it locally.
 
 ## [1.2.0] - 2026-10-02
 
@@ -168,7 +174,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/ilyabrin/argh/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ilyabrin/argh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ilyabrin/argh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0

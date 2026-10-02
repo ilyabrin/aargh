@@ -65,8 +65,8 @@ argh is 10% to 14% faster than `getopt_long`, on par with cargs, and 6% to 15% s
 
 | Parser                                             | GCC 13.3 | Clang 18.1 |
 | -------------------------------------------------- | -------: | ---------: |
-| argh                                               |  16.9 KB |    20.5 KB |
-| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`)          |  13.9 KB |    15.8 KB |
+| argh                                               |  18.3 KB |    22.6 KB |
+| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`)          |  15.3 KB |    17.8 KB |
 | cargs                                              |   2.9 KB |     2.9 KB |
 | argparse                                           |   4.2 KB |     3.9 KB |
 | getopt_long                                        |   0.6 KB |     0.5 KB |
@@ -75,12 +75,12 @@ On a Cortex-M0 (newlib-nano, the same program printing with `printf`):
 
 | Parser                    | Flash added |
 | ------------------------- | ----------: |
-| argh                      |     31.8 KB |
-| argh with `ARGH_NO_FLOAT` |     10.1 KB |
+| argh                      |     32.9 KB |
+| argh with `ARGH_NO_FLOAT` |     11.2 KB |
 | cargs                     |      1.7 KB |
 | argparse                  |     22.6 KB |
 
-argh is the largest because it carries help formatting, error messages, value checking, commands, suggestions and rules; the strings alone are a few KB. Its reduced builds remove what you don't use. On firmware the C library's float parser dominates: argparse pulls in `strtof` for its float type, argh `strtod` unless you define `ARGH_NO_FLOAT`.
+argh is the largest because it carries help formatting, error messages, value checking, commands, suggestions and rules; the strings alone are a few KB. Its reduced builds remove what you don't use. This program keeps stdio, so argh also links newlib's `getenv` for environment variables (about 1 KB); built with `ARGH_NO_STDIO`, firmware has no environment and argh adds about 11 KB (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). On firmware the C library's float parser dominates: argparse pulls in `strtof` for its float type, argh `strtod` unless you define `ARGH_NO_FLOAT`.
 
 ## Which one to pick
 
