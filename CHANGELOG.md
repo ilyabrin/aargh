@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 
 - Option kinds are renumbered so that "is this an option" is one comparison. They are internal since 1.0, so no program is affected.
+- CI runs with a read-only token (`permissions: contents: read`), as CodeQL recommends.
 - Code size is now measured on release builds (`-DNDEBUG`), what programs ship; debug builds also carry the definition and example checks.
 
 ## [1.0.0] - 2026-10-02

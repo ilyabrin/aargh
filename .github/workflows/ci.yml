@@ -5,6 +5,10 @@ on:
     branches: [main]
   pull_request:
 
+# The jobs only build and test the code: the token needs nothing but read access
+permissions:
+  contents: read
+
 jobs:
   unix:
     name: ${{ matrix.os }} / ${{ matrix.cc }}
