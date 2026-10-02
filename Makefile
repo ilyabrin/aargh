@@ -8,6 +8,7 @@
 #   make smoke      run the examples and check their output
 #   make bench      run benchmarks (speed and code size)
 #   make size-arm   flash added to bare-metal ARM firmware (needs arm-none-eabi-gcc)
+#   make docs-check check README examples and llms.txt against the code (Python 3)
 #   make cxx        check that argh.h compiles as C++
 #   make CC=clang   use a different compiler
 
@@ -15,6 +16,7 @@ CFLAGS ?= -std=c99 -Wall -Wextra -Wpedantic -Werror -O2
 
 ifeq ($(OS),Windows_NT)
     EXE = .exe
+    PYTHON ?= python
     # cmd's del wants backslashes
     RM  = cmd /C del /Q
     fixpath = $(subst /,\,$(1))
@@ -24,6 +26,7 @@ ifeq ($(OS),Windows_NT)
     endif
 else
     EXE =
+    PYTHON ?= python3
     RM  = rm -f
     fixpath = $(1)
 endif
@@ -31,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -88,6 +91,10 @@ bench: bench_parse$(EXE)
 
 bench_parse$(EXE): bench/bench_parse.c argh.h
 	$(CC) -std=c11 -O2 -DNDEBUG -Wall -Wextra -o $@ bench/bench_parse.c
+
+# Code and output in README.md, examples/README.md and llms.txt
+docs-check:
+	$(PYTHON) tests/docs/check_docs.py --cc $(CC)
 
 size-arm:
 	sh bench/size_arm.sh

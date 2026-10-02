@@ -1,5 +1,5 @@
 /*
- * argh.h - v1.1.0 - Single-header command-line argument parser for C
+ * argh.h - v1.2.0 - Single-header command-line argument parser for C
  *
  * The API follows Semantic Versioning: no breaking changes before v2.0.
  *
@@ -35,6 +35,7 @@
  *   ARGH_MAX_OPTS     options on the active command path, all tables (64)
  *   ARGH_MAX_TABLES   tables per parser, the builder counts as one (8)
  *   ARGH_MAX_DEPTH    levels of nested commands (4)
+ *   ARGH_HELP_WIDTH   column where help text wraps, 0 for none (80)
  *   ARGH_NO_SUGGEST   no "did you mean" suggestions in error messages
  *   ARGH_NO_COMMANDS  no commands: smaller code for programs without them
  *   ARGH_NO_STDIO     no <stdio.h>: output goes only to argh_set_writer()
@@ -55,9 +56,9 @@
  *     #error "needs argh.h 1.0 or later"
  *     #endif */
 #define ARGH_VERSION_MAJOR 1
-#define ARGH_VERSION_MINOR 1
+#define ARGH_VERSION_MINOR 2
 #define ARGH_VERSION_PATCH 0
-#define ARGH_VERSION "1.1.0"
+#define ARGH_VERSION "1.2.0"
 
 /* ARGH_STATIC: every function is static and the implementation is included,
  * for a program in one file or a library that embeds its own copy of argh.h
@@ -89,6 +90,12 @@
 
 #ifndef ARGH_MAX_DEPTH
 #define ARGH_MAX_DEPTH 4
+#endif
+
+/* Help text wraps at this column; 0 turns wrapping off and leaves its code
+ * out. Only output depends on it, so files may use different values. */
+#ifndef ARGH_HELP_WIDTH
+#define ARGH_HELP_WIDTH 80
 #endif
 
 /* The settings above change the size of argh_parser, so every file that
@@ -2563,17 +2570,16 @@ extern "C"
         return b.len;
     }
 
-    /* " (default: ...)" from the variable's current value */
-    static void argh__help_default(const argh_parser *p, const argh_opt *o)
+    /* "(default: ...)" from the variable's current value, written to buf, or
+     * "(required)"; NULL when there is nothing to show */
+    static const char *argh__help_default(const argh_opt *o, char *buf, size_t size)
     {
         char num[64];
         const char *text = NULL;
+        argh__sb b;
 
         if (o->flags & ARGH_REQUIRED)
-        {
-            argh__out(p, 0, " (required)");
-            return;
-        }
+            return "(required)";
         switch (o->kind)
         {
         case ARGH__K_INT:
@@ -2619,31 +2625,109 @@ extern "C"
         default:
             break;
         }
-        if (text)
+        if (!text)
+            return NULL;
+        b.buf = buf;
+        b.size = size;
+        b.len = 0;
+        argh__sb_put(&b, "(default: ");
+        argh__sb_put(&b, text);
+        argh__sb_char(&b, ')');
+        return buf;
+    }
+
+#if ARGH_HELP_WIDTH > 0
+    /* Writes text from column *col, word by word, starting a new line at
+     * column indent before a word would pass ARGH_HELP_WIDTH. A newline in
+     * the text starts a new line too. A word longer than the line is kept
+     * whole, and with whole the entire text is one word, so "(default: x)"
+     * never splits. Calls continue where the last one ended, one space apart. */
+    static void argh__wrap(const argh_parser *p, const char *text, int indent, int *col, bool whole)
+    {
+        while (*text)
         {
-            argh__out(p, 0, " (default: ");
-            argh__out(p, 0, text);
-            argh__out(p, 0, ")");
+            const char *word = text;
+            int len;
+            if (whole)
+            {
+                text += strlen(text);
+            }
+            else
+            {
+                if (*text == ' ')
+                {
+                    text++;
+                    continue;
+                }
+                if (*text == '\n')
+                {
+                    argh__out(p, 0, "\n");
+                    argh__spaces(p, indent);
+                    *col = indent;
+                    text++;
+                    continue;
+                }
+                while (*text && *text != ' ' && *text != '\n')
+                    text++;
+            }
+            len = (int)(text - word);
+            if (*col > indent)
+            {
+                if (*col + 1 + len > ARGH_HELP_WIDTH)
+                {
+                    argh__out(p, 0, "\n");
+                    argh__spaces(p, indent);
+                    *col = indent;
+                }
+                else
+                {
+                    argh__out(p, 0, " ");
+                    (*col)++;
+                }
+            }
+            argh__outn(p, 0, word, (size_t)len);
+            *col += len;
         }
     }
+#else
+    /* Wrapping is off: the text as it is, one space after earlier text */
+    static void argh__wrap(const argh_parser *p, const char *text, int indent, int *col, bool whole)
+    {
+        (void)whole;
+        if (!*text)
+            return;
+        if (*col > indent)
+            argh__out(p, 0, " ");
+        argh__out(p, 0, text);
+        *col = indent + 1;
+    }
+#endif
 
     static void argh__help_line(const argh_parser *p, const char *left, size_t left_len,
                                 const char *help, int column, const argh_opt *o)
     {
+        char def[96];
+        int indent = 2 + column + 2;
+        int col = indent;
         argh__spaces(p, 2);
         argh__outn(p, 0, left, left_len);
         if ((int)left_len > column)
         {
             argh__out(p, 0, "\n");
-            argh__spaces(p, 2 + column + 2);
+            argh__spaces(p, indent);
         }
         else
         {
             argh__spaces(p, column - (int)left_len + 2);
         }
-        argh__out(p, 0, help);
+        if (help)
+            argh__wrap(p, help, indent, &col, false);
         if (o)
-            argh__help_default(p, o);
+        {
+            const char *d = argh__help_default(o, def, sizeof(def));
+            if (d)
+                argh__wrap(p, d, indent, &col, true);
+        }
         argh__out(p, 0, "\n");
     }
 
@@ -2705,8 +2789,9 @@ extern "C"
             const char *about = ARGH__LEAF(p) ? ARGH__LEAF(p)->help : p->argh__about;
             if (about)
             {
+                int col = 0;
                 argh__out(p, 0, "\n");
-                argh__out(p, 0, about);
+                argh__wrap(p, about, 0, &col, false);
                 argh__out(p, 0, "\n");
             }
         }
@@ -2810,8 +2895,9 @@ extern "C"
                 argh__out(p, 0, "\n");
                 if (o->help)
                 {
-                    argh__out(p, 0, "      ");
-                    argh__out(p, 0, o->help);
+                    int col = 6;
+                    argh__spaces(p, 6);
+                    argh__wrap(p, o->help, 6, &col, false);
                     argh__out(p, 0, "\n");
                 }
             }

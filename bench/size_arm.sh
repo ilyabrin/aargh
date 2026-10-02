@@ -14,7 +14,7 @@ FLAGS="-std=c99 -Os -Wall -Wextra -Werror -ffunction-sections -fdata-sections
 
 # Budgets in bytes of flash added, for the two firmware builds
 BUDGET_FULL=12288     # ARGH_NO_FLOAT
-BUDGET_REDUCED=10240  # ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST
+BUDGET_REDUCED=10240  # ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST ARGH_HELP_WIDTH=0
 
 flash() {
     # text + data: data is copied from flash at startup
@@ -38,7 +38,7 @@ for cpu in cortex-m0 cortex-m4; do
         case $build_name in
             with-double) defs="$FW" budget= ;;
             full) defs="$FW -DARGH_NO_FLOAT" budget=$BUDGET_FULL ;;
-            reduced) defs="$FW -DARGH_NO_FLOAT -DARGH_NO_COMMANDS -DARGH_NO_SUGGEST" budget=$BUDGET_REDUCED ;;
+            reduced) defs="$FW -DARGH_NO_FLOAT -DARGH_NO_COMMANDS -DARGH_NO_SUGGEST -DARGH_HELP_WIDTH=0" budget=$BUDGET_REDUCED ;;
         esac
         build $arch $defs -DARGH_PROBE_PARSER -o "$OUT/argh.elf" "$DIR/size_fw.c"
         added=$(( $(flash "$OUT/argh.elf") - base ))
@@ -53,5 +53,5 @@ done
 echo
 echo "with-double: ARGH_NO_STDIO only; strtod pulls in newlib's float parser and printf"
 echo "full:        + ARGH_NO_FLOAT"
-echo "reduced:     + ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST"
+echo "reduced:     + ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST ARGH_HELP_WIDTH=0"
 exit $status

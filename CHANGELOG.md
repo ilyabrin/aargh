@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-02
+
+### Added
+
+- Help wraps long descriptions at 80 columns, lined up under the description column. A default value always stays whole on one line, and a `\n` in a description starts a new line at the same column. `ARGH_HELP_WIDTH` sets the width; `0` turns wrapping off and leaves its code out. Usage examples are not wrapped.
+- `make docs-check` and a `docs` CI job: the code in README.md compiles, every `$ ./...` command in README.md and examples/README.md prints exactly what the docs show, every public name is documented, and the snippets in llms.txt compile. The programs behind README live in `tests/docs`.
+- The reduced firmware build in the size budget now also sets `ARGH_HELP_WIDTH=0`; wrapping costs about 250 bytes of flash on a Cortex-M.
+
+### Fixed
+
+- The `wc` and `logship` output shown in examples/README.md was only right on Windows: it read LICENSE and SECURITY.md, whose size depends on the line endings git checks out. The examples now read sample logs in `examples/data` with LF line endings on every platform.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added
@@ -149,7 +161,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/ilyabrin/argh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ilyabrin/argh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/ilyabrin/argh/compare/v0.3.1...v0.4.0

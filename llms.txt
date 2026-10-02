@@ -179,6 +179,7 @@ argh_custom(&p, 'p', "port", &port, &port_type, "Port to listen on");
 - `ARGH_NO_STDIO`: no `<stdio.h>`; output goes only to the writer. For firmware.
 - `ARGH_NO_FLOAT`: removes `argh_double`, so `strtod` is not linked (saves about 27 KB on newlib firmware).
 - `ARGH_BUILDER_CAP` (32), `ARGH_MAX_OPTS` (64), `ARGH_MAX_TABLES` (8), `ARGH_MAX_DEPTH` (4): capacities.
+- `ARGH_HELP_WIDTH` (80): column where help descriptions wrap; `0` turns wrapping off. A `\n` in a description starts a new line at the description column.
 - `ARGH_VERSION_MAJOR`, `ARGH_VERSION_MINOR`, `ARGH_VERSION_PATCH`, `ARGH_VERSION`: the version of argh.h.
 
 ## Docs

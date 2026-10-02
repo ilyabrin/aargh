@@ -1,0 +1,15 @@
+2026-10-02T09:14:02Z INFO  http listening on :8080
+2026-10-02T09:14:02Z INFO  db pool ready, 8 connections
+2026-10-02T09:14:07Z INFO  GET /health 200 0.4ms
+2026-10-02T09:15:11Z INFO  POST /api/orders 201 18.2ms user=4812
+2026-10-02T09:15:12Z INFO  GET /api/orders/9931 200 3.1ms user=4812
+2026-10-02T09:16:40Z WARN  slow query 812ms: SELECT * FROM orders WHERE status = 'open'
+2026-10-02T09:17:03Z INFO  GET /api/products?page=2 200 7.9ms
+2026-10-02T09:17:58Z ERROR payment provider timeout after 30s order=9932
+2026-10-02T09:17:58Z INFO  retrying payment order=9932 attempt=2
+2026-10-02T09:18:01Z INFO  payment accepted order=9932
+2026-10-02T09:19:30Z INFO  GET /api/orders 200 11.0ms user=1077
+2026-10-02T09:20:45Z WARN  rate limit reached for 203.0.113.7, 429 for 60s
+2026-10-02T09:21:12Z INFO  DELETE /api/carts/552 204 2.2ms user=1077
+2026-10-02T09:22:00Z INFO  cache hit ratio 0.94 over the last 5 minutes
+2026-10-02T09:23:19Z INFO  GET /health 200 0.3ms

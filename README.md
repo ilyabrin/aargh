@@ -5,6 +5,7 @@
 
 A single-header command-line argument parser for C. Your options write straight into your variables.
 
+<!-- docs-check: source=tests/docs/mytool.c -->
 ```c
 int jobs = 4;
 argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
@@ -27,6 +28,7 @@ argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 
 Copy `argh.h` next to your code:
 
+<!-- docs-check: source=tests/docs/mytool.c -->
 ```c
 #include <stdio.h>
 
@@ -57,6 +59,7 @@ int main(int argc, char **argv)
 
 That's the whole setup. Defaults are the values you initialize your variables with, and there is nothing to free.
 
+<!-- docs-check: program=mytool -->
 ```console
 $ ./mytool -v --jobs=8 data.csv
 verbose=1 jobs=8 output=out.txt input=data.csv
@@ -109,6 +112,7 @@ Pass `0` as the short name for a long-only option, and `NULL` as the long name f
 
 ### Choices, lists and the rest of the arguments
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 static const char *const formats[] = {"json", "yaml", "toml", NULL};
 int format = 0;                           /* index into formats: "json" */
@@ -130,6 +134,7 @@ for (int i = 0; i < files.count; i++)
 
 Sizes like `10M`, durations like `30s`, `host:port` pairs: describe the type once with a parse function, then use it for any number of options.
 
+<!-- docs-check: source=tests/docs/sizetool.c -->
 ```c
 /* Returns NULL on success, or a short reason that ends up in the error message */
 static const char *parse_size(const char *text, void *target)
@@ -160,6 +165,7 @@ argh_custom(&p, 's', "max-size", &max_size, &size_type, "Largest file to keep");
 /* or in a table: ARGH_CUSTOM('s', "max-size", &max_size, &size_type, "Largest file to keep") */
 ```
 
+<!-- docs-check: program=sizetool -->
 ```console
 $ ./tool --help
 Usage: tool [OPTIONS]
@@ -180,6 +186,7 @@ The target can be anything, including a struct. `argh_type` is a constant, so it
 
 Builder calls return the option, and modifiers can be chained:
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 argh_required(argh_string(&p, 'o', "output", &output, "Output file"));
 argh_negatable(argh_flag(&p, 0, "color", &color, "Colored output")); /* --color / --no-color */
@@ -190,6 +197,7 @@ argh_optional(argh_pos(&p, "output", &out_path, "Positional that may be omitted"
 
 Did the user actually pass an option, or is it the default? Ask by variable:
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 if (argh_given(&p, &jobs))
     printf("jobs set explicitly\n");
@@ -199,6 +207,7 @@ if (argh_given(&p, &jobs))
 
 Some options only make sense together, or not at all together. Say so in a table that refers to your variables, and argh checks it and explains the problem:
 
+<!-- docs-check: source=tests/docs/export.c -->
 ```c
 static const argh_rule rules[] = {
     ARGH_AT_MOST_ONE(&json, &yaml, &csv),    /* one output format */
@@ -210,6 +219,7 @@ static const argh_rule rules[] = {
 argh_rules(&p, rules);
 ```
 
+<!-- docs-check: program=export -->
 ```console
 $ ./export --json --csv --stdin
 export: options '--json' and '--csv' cannot be used together
@@ -235,6 +245,7 @@ A rule takes 2 to 4 variables. Because rules refer to variables rather than name
 
 For anything else, add a validator. It runs after every other check has passed:
 
+<!-- docs-check: source=tests/docs/export.c -->
 ```c
 static bool check_sizes(argh_parser *p, void *ctx)
 {
@@ -246,6 +257,7 @@ static bool check_sizes(argh_parser *p, void *ctx)
 argh_set_validator(&p, check_sizes, NULL);
 ```
 
+<!-- docs-check: program=export -->
 ```console
 $ ./export --stdin --min-size 50 --max-size 10
 export: --min-size must not be greater than --max-size
@@ -256,6 +268,7 @@ Try 'export --help' for more information.
 
 For larger tools, or to keep the definitions in read-only memory, describe options as data. It's the same parser underneath.
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 static struct { bool verbose; int jobs; const char *host; int port; } cfg = {false, 4, "localhost", 5432};
 
@@ -282,6 +295,7 @@ argh_table(&p, options);
 
 Tools like `git` or `docker` group their work into commands: `tool build`, `tool remote add`. Describe them as a table, each with its own options:
 
+<!-- docs-check: source=tests/docs/tool.c -->
 ```c
 static bool verbose, release, force;
 static const char *name, *url;
@@ -340,6 +354,7 @@ int main(int argc, char **argv)
 
 Every level gets its own help, and `tool help remote add` works like `tool remote add --help`:
 
+<!-- docs-check: program=tool -->
 ```console
 $ ./tool remote add --help
 Usage: tool remote add [OPTIONS] <name> <url>
@@ -361,6 +376,7 @@ Global options:
 
 When a command is missing, the error lists what's available:
 
+<!-- docs-check: program=tool -->
 ```console
 $ ./tool remote
 tool: 'remote' needs a command
@@ -378,11 +394,23 @@ Command names match exactly, like options. A program with commands can't have po
 
 `-h`/`--help` works out of the box, and so does `tool help <command>` in a program with commands. `-V`/`--version` works once you set a version:
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 argh_version(&p, "1.4.2");   /* ./mytool --version  ->  mytool 1.4.2 */
 ```
 
 Help shows the defaults from your variables before parsing, so they are always accurate. `argh_parse` returns `false` after printing help, and `argh_exit_code` returns 0.
+
+Long descriptions wrap at 80 columns, lined up under the description column, and a default stays whole on one line:
+
+<!-- docs-check: skip -->
+```console
+  -r, --retries <n>        How many times to retry a failed upload before giving
+                           up on that file and moving on to the next one
+                           (default: 3)
+```
+
+A `\n` in a description starts a new line at the same column. Set the width with `ARGH_HELP_WIDTH`, or turn wrapping off with `0`, which also leaves its code out (about 250 bytes on a microcontroller). Below 60 columns, lines next to long option names can pass the width. Usage examples are never wrapped, so they can be copied as they are.
 
 Need `-h` for something else, like `--host`? Turn the built-ins off with `argh_set_flags(&p, ARGH_NO_AUTO_HELP)` and call `argh_print_help(&p)` yourself.
 
@@ -390,6 +418,7 @@ Need `-h` for something else, like `--host`? Turn the built-ins off with `argh_s
 
 Show how the tool is used, and never let those examples go stale:
 
+<!-- docs-check: source=tests/docs/convert.c -->
 ```c
 argh_init(&p, "convert", "Converts data files");
 argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
@@ -398,6 +427,7 @@ argh_example(&p, "convert -j 8 data.csv", "Convert with 8 parallel jobs");
 /* or in a table: ARGH_EXAMPLE("convert -j 8 data.csv", "Convert with 8 parallel jobs") */
 ```
 
+<!-- docs-check: program=convert -->
 ```console
 $ ./convert --help
 Usage: convert [OPTIONS] <input>
@@ -419,6 +449,7 @@ Examples:
 
 **argh checks every example.** In builds without `NDEBUG`, `argh_parse` first parses each example exactly like a real command line, against your current options, commands and rules, and writes nothing to your variables. If one doesn't work, because an option was renamed, a value is wrong, a required option or argument is missing, or a rule is broken, the first run says so, with the usual suggestion:
 
+<!-- docs-check: program=convert_broken -->
 ```console
 $ ./convert data.csv
 convert: example 'convert --jbos 8 data.csv' does not work: unknown option '--jbos' (did you mean '--jobs'?)
@@ -437,6 +468,7 @@ On an error, `argh_parse` prints a one-line message plus a hint to stderr and re
 
 Typos in long options and command names get a suggestion:
 
+<!-- docs-check: program=tool -->
 ```console
 $ ./tool --verbsoe build
 tool: unknown option '--verbsoe' (did you mean '--verbose'?)
@@ -451,6 +483,7 @@ Suggestions only name options and commands that are valid at that point, never h
 
 To handle errors yourself:
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 const argh_error *err = argh_last_error(&p);    /* err->code: ARGH_E_UNKNOWN_OPTION, ... */
 
@@ -460,6 +493,7 @@ argh_format_error(&p, message, sizeof message); /* same text, no stdio needed */
 
 To send all output somewhere else (a log, a UART, a test buffer), set a writer:
 
+<!-- docs-check: source=tests/docs/guide.c -->
 ```c
 static void my_writer(void *ctx, bool to_stderr, const char *text, size_t len)
 {
@@ -473,6 +507,7 @@ argh_set_writer(&p, my_writer, NULL);
 
 Define two macros and give argh a writer:
 
+<!-- docs-check: source=tests/docs/mcu.c -->
 ```c
 #define ARGH_NO_STDIO   /* no <stdio.h>, no printf family */
 #define ARGH_NO_FLOAT   /* no argh_double, so no strtod */
@@ -489,7 +524,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.6 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.8 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -524,6 +559,7 @@ Define before including `argh.h`, the same way in every file that includes it. T
 | `ARGH_BUILDER_CAP` |      32 | Options that builder calls can add. `0` if you only use tables                 |
 | `ARGH_MAX_OPTS`    |      64 | Options on the active command path, all tables combined                        |
 | `ARGH_MAX_TABLES`  |       8 | Tables per parser. The builder counts as one                                   |
+| `ARGH_HELP_WIDTH`  |      80 | Column where help text wraps. `0` turns wrapping off                           |
 | `ARGH_MAX_DEPTH`   |       4 | Levels of nested commands                                                      |
 | `ARGH_NO_SUGGEST`  |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
 | `ARGH_NO_COMMANDS` |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
@@ -542,6 +578,7 @@ Everything public in `argh.h`. Names marked *commands* are missing with `ARGH_NO
 
 ### Functions
 
+<!-- docs-check: skip -->
 ```c
 /* Setup */
 void argh_init(argh_parser *p, const char *name, const char *about);  /* name NULL: from argv[0] */
@@ -590,6 +627,7 @@ void argh_print_help(const argh_parser *p);
 
 ### Macros
 
+<!-- docs-check: skip -->
 ```c
 /* Options, in a table ending with ARGH_END. Trailing arguments: [flags[, metavar]] */
 ARGH_FLAG(s, l, &bool_var, help, ...)        ARGH_STRING(s, l, &str_var, help, ...)
@@ -617,13 +655,14 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.1.0" */
+ARGH_VERSION          /* "1.2.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
 
 ### Types
 
+<!-- docs-check: skip -->
 ```c
 typedef struct argh_values { const char **items; int count; int capacity; } argh_values;
 
@@ -687,6 +726,7 @@ v1.0 freezes the API. Most programs compile unchanged; check these:
 
 v0.2 replaces the API. The idea stays the same, but values now go straight into variables:
 
+<!-- docs-check: skip -->
 ```c
 /* v0.1 */
 argh_Parser parser;
@@ -729,7 +769,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.5 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.7 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks
@@ -755,6 +795,7 @@ make smoke      # run the examples and check their output
 make cxx        # check that argh.h compiles as C++
 make fuzz       # fuzz the parser with libFuzzer (needs clang), 60 s by default
 make size-arm   # flash added to ARM firmware, checked against budgets
+make docs-check # README examples and llms.txt match the code (Python 3)
 ```
 
 CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
