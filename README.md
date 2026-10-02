@@ -386,6 +386,51 @@ Help shows the defaults from your variables before parsing, so they are always a
 
 Need `-h` for something else, like `--host`? Turn the built-ins off with `argh_set_flags(&p, ARGH_NO_AUTO_HELP)` and call `argh_print_help(&p)` yourself.
 
+### Examples in help
+
+Show how the tool is used, and never let those examples go stale:
+
+```c
+argh_init(&p, "convert", "Converts data files");
+argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
+argh_pos(&p, "input", &input, "Input file");
+argh_example(&p, "convert -j 8 data.csv", "Convert with 8 parallel jobs");
+/* or in a table: ARGH_EXAMPLE("convert -j 8 data.csv", "Convert with 8 parallel jobs") */
+```
+
+```console
+$ ./convert --help
+Usage: convert [OPTIONS] <input>
+
+Converts data files
+
+Arguments:
+  <input>         Input file
+
+Options:
+  -j, --jobs <n>  Parallel jobs (default: 4)
+
+  -h, --help      Print help
+
+Examples:
+  convert -j 8 data.csv
+      Convert with 8 parallel jobs
+```
+
+**argh checks every example.** In builds without `NDEBUG`, `argh_parse` first parses each example exactly like a real command line, against your current options, commands and rules, and writes nothing to your variables. If one doesn't work, because an option was renamed, a value is wrong, a required option or argument is missing, or a rule is broken, the first run says so, with the usual suggestion:
+
+```console
+$ ./convert data.csv
+convert: example 'convert --jbos 8 data.csv' does not work: unknown option '--jbos' (did you mean '--jobs'?)
+```
+
+`argh_parse` then returns `false` with `ARGH_E_CONFIG`, like any other mistake in the definitions, so a test suite or CI run catches it. Release builds with `-DNDEBUG` skip the check.
+
+- Write the program name first, then the arguments, separated by spaces. `'...'` and `"..."` keep spaces inside one argument. Up to 256 characters and 32 words. No pipes or shell variables: an example is one command line.
+- An example in a command's table is shown in that command's help (`tool remote add --help`), the program's own examples in the program's help. All of them are checked.
+- Not checked: values of [custom types](#your-own-value-types) and whether a list overflows, because both need to write to your variables; and the [validator](#rules-between-options), which reads them.
+- Examples are entries in the option tables, so they count toward `ARGH_MAX_OPTS` and, when added with `argh_example`, toward `ARGH_BUILDER_CAP`.
+
 ### Errors
 
 On an error, `argh_parse` prints a one-line message plus a hint to stderr and returns `false`. `argh_exit_code` then returns 2, the Unix convention for usage errors.
@@ -522,6 +567,7 @@ argh_opt *argh_pos   (argh_parser *p, const char *name, const char **target, con
 argh_opt *argh_rest  (argh_parser *p, const char *name, argh_values *target, const char *help);
 argh_opt *argh_custom(argh_parser *p, char s, const char *l, void *target, const argh_type *type, const char *help);
 argh_opt *argh_group (argh_parser *p, const char *title);
+argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  /* checked without NDEBUG */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -553,6 +599,7 @@ ARGH_LONG(s, l, &long_var, help, ...)        ARGH_POS(name, &str_var, help, ...)
 ARGH_DOUBLE(s, l, &double_var, help, ...)    ARGH_REST(name, &values_var, help, ...)
 ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
+ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
 
 /* Commands, in a table ending with ARGH_CMD_END (commands) */
 ARGH_CMD(name, help, options[, handler[, flags]])   /* flags: ARGH_POSIX */
