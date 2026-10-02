@@ -22,8 +22,8 @@ Eight lines of argh code, and it counts the same as the real `wc`.
 ```console
 $ ./wc LICENSE SECURITY.md
       21     169    1087 LICENSE
-      33     152    1030 SECURITY.md
-      54     321    2117 total
+      33     147     998 SECURITY.md
+      54     316    2085 total
 
 $ ./wc --line LICENSE
 wc: unknown option '--line' (did you mean '--lines'?)
@@ -73,9 +73,9 @@ TLS:
 
 $ ./logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem --chunk 1K --gzip -vv -x bench LICENSE SECURITY.md bench/size.sh
   send  LICENSE: 1087 bytes in 2 requests
-  send  SECURITY.md: 1030 bytes in 2 requests
+  send  SECURITY.md: 998 bytes in 1 request
   skip  bench/size.sh (excluded)
-Plan: 2 files, 2117 bytes in 4 requests to logs.example.com:6514
+Plan: 2 files, 2085 bytes in 3 requests to logs.example.com:6514
       format json, gzip, TLS
       timeout 30s (default), 3 attempts
 ```

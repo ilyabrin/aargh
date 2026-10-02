@@ -17,28 +17,27 @@ The workload: 30 options defined, 17 arguments on the command line (short and lo
 
 argh is measured two ways: with builder calls (`argh_int(&p, ...)`) and with a `static const` table (`ARGH_INT(...)`).
 
-Release builds (`-O2 -DNDEBUG`) of v0.4 on CI runners. CI machines differ from run to run, so each row comes from a single run: the one with the median argh-to-getopt ratio out of five.
+Release builds (`-O2 -DNDEBUG`) of v1.0 on CI runners. CI machines differ from run to run, so each row comes from a single run: the one with the median argh-to-getopt ratio out of five.
 
 | Platform           | argh (table) | argh (builder) | getopt_long |
 | ------------------ | -----------: | -------------: | ----------: |
-| macOS, Clang       |       771 ns |         824 ns |      690 ns |
-| Linux, Clang       |       307 ns |         334 ns |      289 ns |
-| Linux, GCC         |       677 ns |         769 ns |      588 ns |
-| Windows, MinGW GCC |     1,093 ns |       1,149 ns |      908 ns |
+| macOS, Clang       |       508 ns |         557 ns |      635 ns |
+| Linux, Clang       |       551 ns |         628 ns |      628 ns |
+| Linux, GCC         |       605 ns |         706 ns |      622 ns |
+| Windows, MinGW GCC |       953 ns |       1,009 ns |      894 ns |
 
-Across the five runs, argh with a table takes 2% to 29% longer than `getopt_long` (the median is 6% to 20%, depending on the platform), while also validating every value and supporting commands, rules and generated help. In absolute terms that is a fraction of a microsecond, once, at program start. The builder costs a little more than the table because it fills in the option list on every run.
+At the median, argh with a table is 20% faster than `getopt_long` on macOS, 12% faster with Clang and 3% faster with GCC on Linux, and 7% slower with MinGW; across all five runs the range is 28% faster to 7% slower. That is while also validating every value and supporting commands, rules and generated help. In absolute terms the difference is a fraction of a microsecond, once, at program start. The builder costs a little more than the table because it fills in the option list on every run.
 
 ### Between versions
 
 On one machine (Intel Core i5-12400F, Windows 11, MinGW GCC 13.2), best of 9 alternating runs:
 
-|                | v0.3.1   | v0.4.0   |
-| -------------- | -------: | -------: |
-| argh (table)   |   986 ns | 1,005 ns |
-| argh (builder) | 1,040 ns | 1,083 ns |
-| getopt_long    |   860 ns |   863 ns |
+| Change          | argh (table)               | argh (builder)             | getopt_long (control) |
+| --------------- | -------------------------- | -------------------------- | --------------------- |
+| v0.3.1 → v0.4.0 | 986 → 1,005 ns (+2%)       | 1,040 → 1,083 ns (+4%)     | 860 → 863 ns          |
+| v0.4.0 → v1.0.0 | 971 → 871 ns (**−10%**)    | 1,043 → 945 ns (**−9%**)   | 825 → 813 ns          |
 
-v0.4 is about 2% slower than v0.3.1 with a table and 4% with the builder.
+Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use.
 
 ### Debug builds
 
@@ -48,9 +47,9 @@ Without `NDEBUG`, `argh_parse` also checks the definitions for mistakes such as 
 
 Same machine, same workload:
 
-|                  |  v0.1.0 |                  v0.4.0 (table) |
+|                  |  v0.1.0 |                  v1.0.0 (table) |
 | ---------------- | ------: | ------------------------------: |
-| Time per parse   | 2.73 µs |                         1.01 µs |
+| Time per parse   | 2.73 µs |                         0.87 µs |
 | Heap allocations |      11 |                               0 |
 | `sizeof` parser  | 4,880 B | 248 B + 1,848 B builder storage |
 
@@ -64,17 +63,17 @@ v0.1 copied every value to the heap and looked options up by name twice: once wh
 
 ## Code size
 
-The `.text` added to a minimal 3-option program, compared with the same program without a parser. Built with `-Os -ffunction-sections -fdata-sections -Wl,--gc-sections`, v0.4:
+The `.text` added to a minimal 3-option program, compared with the same program without a parser. Built with `-Os -ffunction-sections -fdata-sections -Wl,--gc-sections`, v1.0:
 
 | Platform                     | argh    | argh reduced | getopt_long |
 | ---------------------------- | ------: | -----------: | ----------: |
-| Linux, GCC 13.3 (CI)         | 17.6 KB |      13.9 KB |      0.6 KB |
+| Linux, GCC 13.3 (CI)         | 17.7 KB |      14.0 KB |      0.6 KB |
 | Linux, Clang 18.1 (CI)       | 21.4 KB |      16.0 KB |      0.5 KB |
 | Windows, MinGW GCC 15.2 (CI) | 18.1 KB |              |     28.0 KB |
 
 "Reduced" is `-DARGH_NO_COMMANDS -DARGH_NO_SUGGEST`, for programs that don't need commands or "did you mean" suggestions. What each option saves on Linux GCC: `ARGH_NO_COMMANDS` 3.0 KB, `ARGH_NO_SUGGEST` 0.8 KB, `ARGH_NO_FLOAT` 0.4 KB (far more on firmware, see below).
 
-Linux GCC at each release, as measured then: v0.1 7.3 KB, v0.2 12.1 KB, v0.3 17.1 KB, v0.4 17.6 KB.
+Linux GCC at each release, as measured then: v0.1 7.3 KB, v0.2 12.1 KB, v0.3 17.1 KB, v0.4 17.6 KB, v1.0 17.7 KB.
 
 Read this one with care:
 
@@ -89,9 +88,9 @@ Flash added to a bare-metal firmware shell command with three options, compared 
 
 | Build                                            | Cortex-M0 | Cortex-M4 | Budget  |
 | ------------------------------------------------ | --------: | --------: | ------: |
-| `ARGH_NO_FLOAT`                                  |   11.0 KB |   11.2 KB | 12.0 KB |
-| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST` |    9.2 KB |    9.4 KB | 10.0 KB |
-| with `argh_double` (`ARGH_NO_STDIO` only)        |   38.0 KB |   31.6 KB |       - |
+| `ARGH_NO_FLOAT`                                  |   11.0 KB |   11.3 KB | 12.0 KB |
+| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST` |    9.2 KB |    9.5 KB | 10.0 KB |
+| with `argh_double` (`ARGH_NO_STDIO` only)        |   38.0 KB |   31.7 KB |       - |
 
 - **Numbers include everything linked because of argh**: help and error strings, and the C library functions it calls (`strtol`, `strcmp` and others).
 - **Why doubles cost 27 KB:** newlib's `strtod` brings its float parser and soft-float arithmetic, and through an internal `assert` also `fprintf`. `ARGH_NO_FLOAT` removes `argh_double` so none of it is linked.

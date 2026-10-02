@@ -21,7 +21,7 @@ argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 - **Strict by design.** Ambiguous input is an error, never a guess. No octal surprises, no prefix matching, no `-o=file`.
 - **Fits on a microcontroller.** Without stdio and floating point, argh adds about 11 KB of flash on a Cortex-M0, checked in CI. See [Microcontrollers](#microcontrollers).
 - **Fuzzed and sanitized.** Every pull request runs the tests with ASan and UBSan and fuzzes the parser.
-- **Close to `getopt_long` in speed**, while validating every value. See [Benchmarks](#benchmarks).
+- **On par with `getopt_long` in speed**, while validating every value. See [Benchmarks](#benchmarks).
 
 ## Quick start
 
@@ -444,7 +444,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.2 to 9.4 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.2 to 9.5 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -687,14 +687,14 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Benchmarks
 
-Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v0.4 on CI. Each row comes from one machine; compare within a row:
+Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.0 on CI. Each row comes from one machine; compare within a row:
 
 | Platform           | argh (table) | argh (builder) | getopt_long |
 | ------------------ | -----------: | -------------: | ----------: |
-| macOS, Clang       |       771 ns |         824 ns |      690 ns |
-| Linux, Clang       |       307 ns |         334 ns |      289 ns |
-| Linux, GCC         |       677 ns |         769 ns |      588 ns |
-| Windows, MinGW GCC |     1,093 ns |       1,149 ns |      908 ns |
+| macOS, Clang       |       508 ns |         557 ns |      635 ns |
+| Linux, Clang       |       551 ns |         628 ns |      628 ns |
+| Linux, GCC         |       605 ns |         706 ns |      622 ns |
+| Windows, MinGW GCC |       953 ns |       1,009 ns |      894 ns |
 
 argh makes zero heap allocations. Details, memory, code size and the method: [BENCHMARKS.md](BENCHMARKS.md). Run them with `make bench`.
 
