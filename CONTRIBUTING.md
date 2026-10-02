@@ -40,7 +40,7 @@ For parsing changes, also fuzz for a few minutes: `make fuzz FUZZ_TIME=300` (nee
 - **One topic per PR.** A bug fix and a refactor are two PRs.
 - **A test for every behavior change.** For a bug fix, add a test that fails without the fix. Tests live in [tests/test_argh.c](tests/test_argh.c) and use the `TEST` / `RUN_TEST` / `ASSERT_*` macros at the top of the file.
 - **CI is green.** The build uses `-Werror` on GCC and Clang, so a warning is a failure.
-- **Docs follow the code.** If you change behavior, update [README.md](README.md) and [llms.txt](llms.txt). Performance changes should also update [BENCHMARKS.md](BENCHMARKS.md).
+- **Docs follow the code.** If you change behavior, update [README.md](README.md) and [llms.txt](llms.txt), and run `make docs-check`: it compiles the code shown in the docs, runs every `$ ./...` command and compares the output, and checks that every public name is documented. In README.md each code and console block carries a `<!-- docs-check: ... -->` comment that says which program in [tests/docs](tests/docs) it belongs to; when the output of a program changes, paste the real output into the block. Performance changes should also update [BENCHMARKS.md](BENCHMARKS.md).
 - **A line in [CHANGELOG.md](CHANGELOG.md)** under `Unreleased` for anything a user would notice.
 
 ## Code rules

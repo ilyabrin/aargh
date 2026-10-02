@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - Help wraps long descriptions at 80 columns, lined up under the description column. A default value always stays whole on one line, and a `\n` in a description starts a new line at the same column. `ARGH_HELP_WIDTH` sets the width; `0` turns wrapping off and leaves its code out. Usage examples are not wrapped.
+- `make docs-check` and a `docs` CI job: the code in README.md compiles, every `$ ./...` command in README.md and examples/README.md prints exactly what the docs show, every public name is documented, and the snippets in llms.txt compile. The programs behind README live in `tests/docs`.
 - The reduced firmware build in the size budget now also sets `ARGH_HELP_WIDTH=0`; wrapping costs about 250 bytes of flash on a Cortex-M.
 
 ## [1.1.0] - 2026-10-02
