@@ -4,7 +4,7 @@ Thanks for helping! Bug reports, test cases, docs fixes and code are all welcome
 
 ## Before you start
 
-argh.h is in early development (0.x), and the API can still change until v1.0. Because of that:
+Since v1.0 the API is stable and follows Semantic Versioning, so breaking changes wait for v2.0. Because of that:
 
 - **Bug fixes, tests, docs and portability fixes:** open a pull request directly.
 - **New features or API changes:** please open an issue first. The feature may already be planned, or it may need a different shape. A short discussion saves you from writing code that has to be redone.

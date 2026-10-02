@@ -10,8 +10,7 @@ int jobs = 4;
 argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 ```
 
-> **Status: early development (v0.4).** Tested in CI on every pull request, but the API may still change before v1.0.
-> Feedback on the API is very welcome.
+> **Stable: v1.0.** The API follows [Semantic Versioning](https://semver.org/): no breaking changes before v2.0. Tested in CI on every pull request.
 
 ## Why argh
 
@@ -571,7 +570,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "0.4.0" */
+ARGH_VERSION          /* "1.0.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -628,6 +627,14 @@ The values are stable: new codes are only ever added at the end, so it is safe t
 | `ARGH_E_ONE_REQUIRED`        | none of an `ARGH_EXACTLY_ONE` or `ARGH_AT_LEAST_ONE` set |
 | `ARGH_E_REQUIRES`            | `--tls-key` without `--tls-cert`                         |
 | `ARGH_E_CUSTOM`              | `argh_fail()` from a validator                           |
+
+## Upgrading from 0.4
+
+v1.0 freezes the API. Most programs compile unchanged; check these:
+
+- **Writers take `bool to_stderr`** instead of `int`: change the parameter type of your `argh_write_fn`.
+- **Every file must include argh.h with the same settings** (`ARGH_BUILDER_CAP`, `ARGH_MAX_OPTS`, `ARGH_MAX_TABLES`, `ARGH_MAX_DEPTH`, `ARGH_NO_COMMANDS`). If they differ, the program now fails to link with a name like `argh_init_settings_b8_o64_t8_d4_cmd`; before, it could corrupt memory. Define the settings once, for example with `-D` flags.
+- **`ARGH_K_*` and `ARGH_R_*` are internal now** (`ARGH__K_*`, `ARGH__R_*`). Only code that built `argh_opt` or `argh_rule` entries by hand used them; use the macros instead.
 
 ## Upgrading from 0.1
 

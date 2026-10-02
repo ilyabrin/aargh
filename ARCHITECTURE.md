@@ -162,7 +162,7 @@ argh.h started as a way to learn C properly: write a small, fast argument parser
 
 **v0.4: firmware.** `ARGH_NO_STDIO`, then a measurement of a real Cortex-M0 link that showed where the size actually went, which led to `ARGH_NO_FLOAT`. Flash budgets went into CI, along with fuzzing and a POSIX mode for a single command.
 
-**Toward v1.0.** An audit of every document against the code, an API review (the link-time settings check, version macros, `ARGH_STATIC`, internal names made internal), a guide for coding agents ([llms.txt](llms.txt)), a measured comparison with other parsers ([COMPARISON.md](COMPARISON.md)), and profiling that made parsing 10% to 18% faster.
+**v1.0: stable.** An audit of every document against the code, an API review (the link-time settings check, version macros, `ARGH_STATIC`, internal names made internal), a guide for coding agents ([llms.txt](llms.txt)), a measured comparison with other parsers ([COMPARISON.md](COMPARISON.md)), and profiling that made parsing 10% to 18% faster. With that, the API was frozen.
 
 ## Not in scope
 

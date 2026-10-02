@@ -1,7 +1,7 @@
 /*
- * argh.h - v0.4.0 - Single-header command-line argument parser for C
+ * argh.h - v1.0.0 - Single-header command-line argument parser for C
  *
- * Status: early development. The API may change before v1.0.
+ * The API follows Semantic Versioning: no breaking changes before v2.0.
  *
  * Options write straight into your variables. No heap allocations, no global
  * state, and option tables can be `static const` (read-only memory).
@@ -54,10 +54,10 @@
  *     #if ARGH_VERSION_MAJOR < 1
  *     #error "needs argh.h 1.0 or later"
  *     #endif */
-#define ARGH_VERSION_MAJOR 0
-#define ARGH_VERSION_MINOR 4
+#define ARGH_VERSION_MAJOR 1
+#define ARGH_VERSION_MINOR 0
 #define ARGH_VERSION_PATCH 0
-#define ARGH_VERSION "0.4.0"
+#define ARGH_VERSION "1.0.0"
 
 /* ARGH_STATIC: every function is static and the implementation is included,
  * for a program in one file or a library that embeds its own copy of argh.h

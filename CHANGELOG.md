@@ -2,9 +2,13 @@
 
 All notable changes to argh.h are listed here.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/). Until v1.0, minor versions (0.x) may change the API.
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses [Semantic Versioning](https://semver.org/). Since v1.0, breaking changes only come with a new major version.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-10-02
+
+The first stable release: the API is frozen and follows Semantic Versioning. See [Upgrading from 0.4](README.md#upgrading-from-04) for the three breaking changes.
 
 ### Added
 
@@ -130,7 +134,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/ilyabrin/argh/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ilyabrin/argh/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/ilyabrin/argh/compare/v0.2.0...v0.3.0
