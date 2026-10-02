@@ -13,6 +13,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - [llms.txt](llms.txt): a guide for coding agents, with the setup, the rules that are easy to get wrong and every feature in short.
 - `ARGH_STATIC`: includes the implementation and makes every function `static`, for one-file programs and libraries that embed their own copy.
 
+### Changed
+
+- Parsing is 10% to 18% faster: the checks for names reserved by `--help` and `--version` compare the first letter before calling `strcmp`, and `argh_init` no longer clears the builder storage, which builder calls fill in themselves.
+
 ### Changed (breaking)
 
 - `argh_write_fn` takes `bool to_stderr` instead of `int`. Change the parameter type in your writer.

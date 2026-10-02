@@ -1592,10 +1592,11 @@ extern "C"
             total++;
             if (argh__auto_help(p) && argh__is_option_kind(o->kind))
             {
-                bool clash = o->short_name == 'h' || (o->long_name && strcmp(o->long_name, "help") == 0);
+                /* Runs on every parse: test the first letter before strcmp */
+                const char *l = o->long_name;
+                bool clash = o->short_name == 'h' || (l && l[0] == 'h' && strcmp(l, "help") == 0);
                 if (p->argh__version)
-                    clash = clash || o->short_name == 'V' ||
-                            (o->long_name && strcmp(o->long_name, "version") == 0);
+                    clash = clash || o->short_name == 'V' || (l && l[0] == 'v' && strcmp(l, "version") == 0);
                 if (clash)
                     return argh__config_error(p, "name reserved for help/version, see ARGH_NO_AUTO_HELP", o);
             }
@@ -1658,7 +1659,8 @@ extern "C"
             {
                 if (a[2] == '\0')
                     return false;
-                if (strncmp(a + 2, "help", 4) == 0 || strncmp(a + 2, "version", 7) == 0)
+                if ((a[2] == 'h' && strncmp(a + 2, "help", 4) == 0) ||
+                    (a[2] == 'v' && strncmp(a + 2, "version", 7) == 0))
                     return true;
             }
             else if (strchr(a, 'h') || strchr(a, 'V'))
@@ -1744,7 +1746,12 @@ extern "C"
 
     ARGH__DEF void argh_init(argh_parser *p, const char *name, const char *about)
     {
-        memset(p, 0, sizeof(*p));
+        /* Everything but the builder storage, most of the struct: argh__add
+         * fills its entries and ends the list itself */
+        size_t after = offsetof(argh_parser, argh__builder) + sizeof(p->argh__builder);
+        memset(p, 0, offsetof(argh_parser, argh__builder));
+        memset((char *)p + after, 0, sizeof(*p) - after);
+        p->argh__builder[0].kind = ARGH__K_END;
         p->argh__name = name;
         p->argh__about = about;
         p->argh__write = argh__stdio_write;
@@ -1811,6 +1818,8 @@ extern "C"
         o->extra = extra;
         o->help = help;
         o->metavar = NULL;
+        /* argh_init leaves the builder storage as it is: end the list here */
+        p->argh__builder[p->argh__builder_count].kind = ARGH__K_END;
         return o;
     }
 
