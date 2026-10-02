@@ -143,6 +143,7 @@ The decisions that shaped the library, with the reason that settled each one.
 | Examples in help are checked by parsing them                           | Documentation that compiles but lies is worse than none; a renamed option should break the build of the docs, not the user's copy-paste.                                                   |
 | Examples live in option tables, not in a parser field                  | Keeps the parser state at 248 bytes and gives commands their own examples for free.                                                                                                        |
 | An optional value is an entry right after its option                   | No parser or option field grows, and finding it is one look at the next entry, so parsing pays nothing for it. |
+| A range is an entry after its option, with the bounds in pointer fields | Like optional values, it costs no storage and one read while parsing; the two kinds of entry are the last in the enum, so one compare skips both. |
 | An optional value needs `=`                                            | With `--color never` allowed, adding a value to an option would change what the arguments after it mean. |
 | Environment variables are table entries bound to a variable            | Same reasons as examples, plus a typo in the variable is a compile error, like in rules. Firmware has no environment by default, so `getenv` and the code around it stay out of the image. |
 

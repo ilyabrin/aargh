@@ -6,6 +6,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Ranges: `argh_range(&p, &jobs, 1, 64)` or `ARGH_RANGE(&jobs, 1, 64)` right after an `int`, `long`, `unsigned` or `size_t` option. Values outside the bounds (both included) fail with `value '0' for '-j' is out of range (1 to 64)`, from the command line, the environment or an implicit value. Help shows `<1..64>` unless you set a value name. Without `NDEBUG` argh checks that the range follows an integer option and fits its type. Costs about 200 to 260 bytes on firmware and nothing measurable in parse time.
+
 ## [1.5.0] - 2026-10-03
 
 ### Added
