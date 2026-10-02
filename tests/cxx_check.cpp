@@ -22,6 +22,7 @@ static const argh_opt opts[] = {
     ARGH_STRING('o', "output", &output, "Output file", ARGH_REQUIRED),
     ARGH_ENUM('m', "mode", &mode, modes, "Mode"),
     ARGH_CUSTOM('l', "level", &level, &level_type, "Level"),
+    ARGH_EXAMPLE("cxx --ratio 2 build -o out.txt -j 2", "An example"),
     ARGH_END,
 };
 

@@ -27,7 +27,7 @@ make clean
 
 Use a different compiler with `make CC=clang test`.
 
-CI runs the same commands on Linux (GCC, Clang, plus AddressSanitizer and UndefinedBehaviorSanitizer and 2 minutes of fuzzing), macOS (Clang) and Windows (MinGW, MSVC), and checks the firmware size on ARM (`make size-arm`). If you can, run the sanitizers locally before sending a change that touches parsing:
+CI runs the same commands on Linux x86-64 and ARM64 (GCC, Clang, plus AddressSanitizer and UndefinedBehaviorSanitizer and 2 minutes of fuzzing), macOS (Clang) and Windows (MinGW, MSVC), as 32-bit x86, and under qemu on 32-bit ARM and big-endian s390x and PowerPC. It also checks the firmware size on ARM (`make size-arm`). If you can, run the sanitizers locally before sending a change that touches parsing:
 
 ```sh
 make CC=clang test CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g -fsanitize=address,undefined"

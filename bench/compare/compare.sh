@@ -44,8 +44,8 @@ done
 echo "(cargs returns strings and leaves checking them to the program; behavior.c uses atoi)"
 echo
 
-echo "== Code size (.text added to a 3-option program; -Os, gc-sections)"
-FLAGS="-std=c99 -Os -ffunction-sections -fdata-sections -Wl,--gc-sections"
+echo "== Code size (.text added to a 3-option program; -Os -DNDEBUG, gc-sections)"
+FLAGS="-std=c99 -Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections"
 text() { size "$1" | awk 'NR==2 {print $1}'; }
 $CC $FLAGS -o "$OUT/none" "$ROOT/bench/size_none.c"
 base=$(text "$OUT/none")

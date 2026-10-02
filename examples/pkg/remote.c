@@ -35,6 +35,8 @@ static const argh_opt add_opts[] = {
     ARGH_FLAG('f', "force", &opt.remote_add.force, "Replace a remote with the same name"),
     ARGH_POS("name", &opt.remote_add.name, "Short name, such as origin"),
     ARGH_POS("url", &opt.remote_add.url, "Where the packages come from"),
+    ARGH_EXAMPLE("pkg remote add origin https://pkgs.example.com", NULL),
+    ARGH_EXAMPLE("pkg remote add -f mirror https://mirror.example.com", "Replace an existing source"),
     ARGH_END
 };
 

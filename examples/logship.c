@@ -195,6 +195,13 @@ static const argh_opt options[] = {
     ARGH_FLAG(0, "verify", &cfg.verify, "Check the collector's certificate", ARGH_NEGATABLE),
 
     ARGH_REST("files", &cfg.files, "Log files to send"),
+
+    /* Shown at the end of --help; debug builds check that they parse and
+     * keep to the rules below */
+    ARGH_EXAMPLE("logship --to logs.example.com:6514 app.log", "Send one file as JSON"),
+    ARGH_EXAMPLE("logship -t 10.0.0.5:514 -f syslog --gzip -x .gz app.log db.log", "Syslog records, gzipped, skipping archives"),
+    ARGH_EXAMPLE("logship --stdin --to localhost:9000 --format raw", "Forward whatever arrives on standard input"),
+    ARGH_EXAMPLE("logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem app.log", "With a client certificate"),
     ARGH_END
 };
 

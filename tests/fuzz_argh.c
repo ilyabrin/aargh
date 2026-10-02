@@ -63,6 +63,8 @@ static const argh_opt table[] = {
     ARGH_LIST('I', "include", &v.include, "Include dir"),
     ARGH_CUSTOM('L', "level", &v.level, &level_type, "Level", ARGH_ONCE),
     ARGH_FLAG(0, "color", &v.color, "Color", ARGH_NEGATABLE),
+    /* Checked on every parse in debug builds; valid with every flag combination */
+    ARGH_EXAMPLE("fz -o out -I a --include=b --level 3 --no-color", "An example"),
     ARGH_END,
 };
 
@@ -78,6 +80,7 @@ static const argh_opt install_opts[] = {
     ARGH_FLAG('D', "dev", &v.dev, "Dev"),
     ARGH_STRING(0, "version", &v.pkg, "Package version"),
     ARGH_REST("packages", &v.rest, "Packages"),
+    ARGH_EXAMPLE("fz install -D left-pad 'two words'", NULL),
     ARGH_END,
 };
 

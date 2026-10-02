@@ -10,7 +10,7 @@ int jobs = 4;
 argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 ```
 
-> **Stable: v1.0.** The API follows [Semantic Versioning](https://semver.org/): no breaking changes before v2.0. Tested in CI on every pull request.
+> **Stable since v1.0.** The API follows [Semantic Versioning](https://semver.org/): no breaking changes before v2.0. Tested in CI on every pull request.
 
 ## Why argh
 
@@ -386,6 +386,51 @@ Help shows the defaults from your variables before parsing, so they are always a
 
 Need `-h` for something else, like `--host`? Turn the built-ins off with `argh_set_flags(&p, ARGH_NO_AUTO_HELP)` and call `argh_print_help(&p)` yourself.
 
+### Examples in help
+
+Show how the tool is used, and never let those examples go stale:
+
+```c
+argh_init(&p, "convert", "Converts data files");
+argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
+argh_pos(&p, "input", &input, "Input file");
+argh_example(&p, "convert -j 8 data.csv", "Convert with 8 parallel jobs");
+/* or in a table: ARGH_EXAMPLE("convert -j 8 data.csv", "Convert with 8 parallel jobs") */
+```
+
+```console
+$ ./convert --help
+Usage: convert [OPTIONS] <input>
+
+Converts data files
+
+Arguments:
+  <input>         Input file
+
+Options:
+  -j, --jobs <n>  Parallel jobs (default: 4)
+
+  -h, --help      Print help
+
+Examples:
+  convert -j 8 data.csv
+      Convert with 8 parallel jobs
+```
+
+**argh checks every example.** In builds without `NDEBUG`, `argh_parse` first parses each example exactly like a real command line, against your current options, commands and rules, and writes nothing to your variables. If one doesn't work, because an option was renamed, a value is wrong, a required option or argument is missing, or a rule is broken, the first run says so, with the usual suggestion:
+
+```console
+$ ./convert data.csv
+convert: example 'convert --jbos 8 data.csv' does not work: unknown option '--jbos' (did you mean '--jobs'?)
+```
+
+`argh_parse` then returns `false` with `ARGH_E_CONFIG`, like any other mistake in the definitions, so a test suite or CI run catches it. Release builds with `-DNDEBUG` skip the check.
+
+- Write the program name first, then the arguments, separated by spaces. `'...'` and `"..."` keep spaces inside one argument. Up to 256 characters and 32 words. No pipes or shell variables: an example is one command line.
+- An example in a command's table is shown in that command's help (`tool remote add --help`), the program's own examples in the program's help. All of them are checked.
+- Not checked: values of [custom types](#your-own-value-types) and whether a list overflows, because both need to write to your variables; and the [validator](#rules-between-options), which reads them.
+- Examples are entries in the option tables, so they count toward `ARGH_MAX_OPTS` and, when added with `argh_example`, toward `ARGH_BUILDER_CAP`.
+
 ### Errors
 
 On an error, `argh_parse` prints a one-line message plus a hint to stderr and returns `false`. `argh_exit_code` then returns 2, the Unix convention for usage errors.
@@ -444,7 +489,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.2 to 9.5 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.6 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -481,7 +526,7 @@ Define before including `argh.h`, the same way in every file that includes it. T
 | `ARGH_MAX_TABLES`  |       8 | Tables per parser. The builder counts as one                                   |
 | `ARGH_MAX_DEPTH`   |       4 | Levels of nested commands                                                      |
 | `ARGH_NO_SUGGEST`  |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
-| `ARGH_NO_COMMANDS` |         | Define to remove commands (about 3.0 KB) if you don't use them                 |
+| `ARGH_NO_COMMANDS` |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
 | `ARGH_NO_STDIO`    |         | Define to build without `<stdio.h>`, see [Microcontrollers](#microcontrollers) |
 | `ARGH_NO_FLOAT`    |         | Define to remove `argh_double` and floating point (27 KB on newlib firmware)   |
 | `ARGH_STATIC`      |         | Define to include the implementation with every function `static`              |
@@ -522,6 +567,7 @@ argh_opt *argh_pos   (argh_parser *p, const char *name, const char **target, con
 argh_opt *argh_rest  (argh_parser *p, const char *name, argh_values *target, const char *help);
 argh_opt *argh_custom(argh_parser *p, char s, const char *l, void *target, const argh_type *type, const char *help);
 argh_opt *argh_group (argh_parser *p, const char *title);
+argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  /* checked without NDEBUG */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -553,6 +599,7 @@ ARGH_LONG(s, l, &long_var, help, ...)        ARGH_POS(name, &str_var, help, ...)
 ARGH_DOUBLE(s, l, &double_var, help, ...)    ARGH_REST(name, &values_var, help, ...)
 ARGH_CUSTOM(s, l, &any_var, &type, help, ...)
 ARGH_GROUP(title)                            ARGH_END
+ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
 
 /* Commands, in a table ending with ARGH_CMD_END (commands) */
 ARGH_CMD(name, help, options[, handler[, flags]])   /* flags: ARGH_POSIX */
@@ -570,7 +617,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.0.0" */
+ARGH_VERSION          /* "1.1.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -682,7 +729,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9 to 11 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.5 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks
@@ -710,7 +757,7 @@ make fuzz       # fuzz the parser with libFuzzer (needs clang), 60 s by default
 make size-arm   # flash added to ARM firmware, checked against budgets
 ```
 
-CI runs all of these on Linux, macOS and Windows (GCC, Clang, MinGW, MSVC), plus AddressSanitizer and UndefinedBehaviorSanitizer and 2 minutes of fuzzing on every pull request. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
+CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
 
 ## Contributing
 

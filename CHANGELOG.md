@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-02
+
+### Added
+
+- CI runs the full test suite on more platforms: Linux ARM64, 32-bit x86, and under qemu 32-bit ARM and big-endian s390x and PowerPC.
+- Usage examples in help: `argh_example(&p, "tool -j 8 data.csv", "What it does")` or `ARGH_EXAMPLE(...)` in a table. They are listed at the end of the program's help, or of a command's help when they sit in the command's table.
+- Examples are checked: in builds without `NDEBUG`, `argh_parse` parses every example against the current options, commands and rules, without writing to any variable, and fails with `ARGH_E_CONFIG` and a message naming the example if one doesn't work. Release builds skip the check, and the parser does not grow.
+- Cost in a release build: about 180 bytes of flash on a Cortex-M0 for the help section, even without examples. The check itself exists only in debug builds.
+
+### Changed
+
+- Option kinds are renumbered so that "is this an option" is one comparison. They are internal since 1.0, so no program is affected.
+- CI runs with a read-only token (`permissions: contents: read`), as CodeQL recommends.
+- Code size is now measured on release builds (`-DNDEBUG`), what programs ship; debug builds also carry the definition and example checks.
+
 ## [1.0.0] - 2026-10-02
 
 The first stable release: the API is frozen and follows Semantic Versioning. See [Upgrading from 0.4](README.md#upgrading-from-04) for the three breaking changes.
@@ -134,7 +149,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ilyabrin/argh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/ilyabrin/argh/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ilyabrin/argh/compare/v0.3.0...v0.3.1
