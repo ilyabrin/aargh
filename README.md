@@ -10,7 +10,7 @@ int jobs = 4;
 argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 ```
 
-> **Stable: v1.0.** The API follows [Semantic Versioning](https://semver.org/): no breaking changes before v2.0. Tested in CI on every pull request.
+> **Stable since v1.0.** The API follows [Semantic Versioning](https://semver.org/): no breaking changes before v2.0. Tested in CI on every pull request.
 
 ## Why argh
 
@@ -489,7 +489,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.2 to 9.5 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.6 KB with `ARGH_NO_COMMANDS` and `ARGH_NO_SUGGEST` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -526,7 +526,7 @@ Define before including `argh.h`, the same way in every file that includes it. T
 | `ARGH_MAX_TABLES`  |       8 | Tables per parser. The builder counts as one                                   |
 | `ARGH_MAX_DEPTH`   |       4 | Levels of nested commands                                                      |
 | `ARGH_NO_SUGGEST`  |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
-| `ARGH_NO_COMMANDS` |         | Define to remove commands (about 3.0 KB) if you don't use them                 |
+| `ARGH_NO_COMMANDS` |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
 | `ARGH_NO_STDIO`    |         | Define to build without `<stdio.h>`, see [Microcontrollers](#microcontrollers) |
 | `ARGH_NO_FLOAT`    |         | Define to remove `argh_double` and floating point (27 KB on newlib firmware)   |
 | `ARGH_STATIC`      |         | Define to include the implementation with every function `static`              |
@@ -617,7 +617,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.0.0" */
+ARGH_VERSION          /* "1.1.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -729,7 +729,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9 to 11 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.5 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks

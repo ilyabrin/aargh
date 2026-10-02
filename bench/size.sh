@@ -1,12 +1,12 @@
 #!/bin/sh
-# Code-size benchmark: .text growth over a parser-free baseline.
+# Code-size benchmark: .text growth over a parser-free baseline, release builds.
 # Usage: sh bench/size.sh [compiler]   (default: cc)
 set -e
 CC=${1:-cc}
 DIR=$(cd "$(dirname "$0")" && pwd)
 OUT=$(mktemp -d)
 trap 'rm -rf "$OUT"' EXIT
-FLAGS="-std=c99 -Os -ffunction-sections -fdata-sections -Wl,--gc-sections"
+FLAGS="-std=c99 -Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections"
 EXE=
 case "$(uname -s)" in
     Darwin)

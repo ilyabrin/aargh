@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-02
+
 ### Added
 
 - CI runs the full test suite on more platforms: Linux ARM64, 32-bit x86, and under qemu 32-bit ARM and big-endian s390x and PowerPC.
@@ -16,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Changed
 
 - Option kinds are renumbered so that "is this an option" is one comparison. They are internal since 1.0, so no program is affected.
+- Code size is now measured on release builds (`-DNDEBUG`), what programs ship; debug builds also carry the definition and example checks.
 
 ## [1.0.0] - 2026-10-02
 
@@ -145,7 +148,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/ilyabrin/argh/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/ilyabrin/argh/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/ilyabrin/argh/compare/v0.3.0...v0.3.1
