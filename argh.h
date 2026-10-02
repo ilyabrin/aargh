@@ -572,6 +572,17 @@ extern "C"
 #ifdef ARGH_NO_STDIO
 /* No environment: ARGH_ENV entries are accepted and do nothing */
 #define ARGH__NO_ENV
+#elif defined(_MSC_VER)
+/* MSVC deprecates getenv (C4996), which /WX turns into an error. The value
+ * is only read, never kept past argh_parse, so getenv is safe here. */
+#pragma warning(push)
+#pragma warning(disable : 4996)
+static const char *argh__getenv(const char *name)
+{
+    return getenv(name);
+}
+#pragma warning(pop)
+#define ARGH_GETENV(name) argh__getenv(name)
 #else
 #define ARGH_GETENV(name) getenv(name)
 #endif

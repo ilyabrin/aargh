@@ -96,7 +96,9 @@ static void set_env(const char *name, const char *value)
 
 static void reset_output(void)
 {
-    memset(fake_env_names, 0, sizeof(fake_env_names));
+    int i;
+    for (i = 0; i < 4; i++)
+        fake_env_names[i] = NULL;
     out_len = err_len = 0;
     out_text[0] = err_text[0] = '\0';
 }
