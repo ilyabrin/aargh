@@ -3072,6 +3072,138 @@ TEST(test_implicit_config_errors)
 }
 #endif
 
+/* ============================================================================
+ * Ranges (ARGH_RANGE)
+ * ============================================================================ */
+
+static int rg_jobs;
+static long rg_offset;
+static unsigned rg_level;
+static size_t rg_cache;
+static const argh_opt rg_opts[] = {
+    ARGH_INT('j', "jobs", &rg_jobs, "Parallel jobs"),
+    ARGH_RANGE(&rg_jobs, 1, 64),
+    ARGH_ENV(&rg_jobs, "TOOL_JOBS"),
+    ARGH_LONG(0, "offset", &rg_offset, "Offset"),
+    ARGH_RANGE(&rg_offset, -100, 100),
+    ARGH_UINT(0, "level", &rg_level, "Level"),
+    ARGH_IMPLICIT(&rg_level, "6"),
+    ARGH_RANGE(&rg_level, 1, 9),
+    ARGH_SIZE(0, "cache", &rg_cache, "Cache size"),
+    ARGH_RANGE(&rg_cache, 0, 1024),
+    ARGH_END,
+};
+
+static argh_parser rg_p;
+
+static bool rg_parse(int argc, char **argv)
+{
+    rg_jobs = 4;
+    rg_offset = 0;
+    rg_level = 3;
+    rg_cache = 0;
+    setup(&rg_p);
+    argh_table(&rg_p, rg_opts);
+    return argh_parse(&rg_p, argc, argv);
+}
+
+TEST(test_range_accepts_bounds)
+{
+    ARGV("-j", "64", "--offset=-100", "--level", "--cache=1024");
+    ASSERT_TRUE(rg_parse(argc, argv));
+    ASSERT_EQ(rg_jobs, 64);
+    ASSERT_TRUE(rg_offset == -100);
+    ASSERT_EQ(rg_level, 6);
+    ASSERT_TRUE(rg_cache == 1024);
+}
+
+TEST(test_range_rejects_outside)
+{
+    {
+        ARGV("-j", "0");
+        ASSERT_FALSE(rg_parse(argc, argv));
+        ASSERT_STR_EQ(error_text(&rg_p), "value '0' for '-j' is out of range (1 to 64)");
+        ASSERT_EQ(rg_jobs, 4);
+    }
+    {
+        ARGV("--offset=101");
+        ASSERT_FALSE(rg_parse(argc, argv));
+        ASSERT_STR_EQ(error_text(&rg_p), "value '101' for '--offset' is out of range (-100 to 100)");
+    }
+    {
+        ARGV("--level=0");
+        ASSERT_FALSE(rg_parse(argc, argv));
+        ASSERT_STR_EQ(error_text(&rg_p), "value '0' for '--level' is out of range (1 to 9)");
+    }
+    {
+        ARGV("--cache", "99999999999999999999999");
+        ASSERT_FALSE(rg_parse(argc, argv));
+        ASSERT_STR_EQ(error_text(&rg_p), "value '99999999999999999999999' for '--cache' is out of range (0 to 1024)");
+    }
+    {
+        ARGV("--cache", "-1");
+        ASSERT_FALSE(rg_parse(argc, argv));
+        ASSERT_EQ(argh_last_error(&rg_p)->code, ARGH_E_INVALID_VALUE);
+    }
+}
+
+TEST(test_range_env)
+{
+    ARGV0();
+    reset_output();
+    set_env("TOOL_JOBS", "100");
+    ASSERT_FALSE(rg_parse(argc, argv));
+    ASSERT_STR_EQ(error_text(&rg_p), "value '100' in TOOL_JOBS for '--jobs' is out of range (1 to 64)");
+}
+
+TEST(test_range_help)
+{
+    ARGV("--help");
+    ASSERT_FALSE(rg_parse(argc, argv));
+    ASSERT_TRUE(strstr(out_text, "  -j, --jobs <1..64>  ") != NULL);
+    ASSERT_TRUE(strstr(out_text, "      --offset <-100..100>  ") != NULL);
+    ASSERT_TRUE(strstr(out_text, "      --level[=<1..9>]  ") != NULL);
+}
+
+TEST(test_range_builder)
+{
+    ARGV("--port", "70000");
+    int port = 8080;
+    argh_parser p;
+    setup(&p);
+    argh_metavar(argh_int(&p, 'p', "port", &port, "Port"), "<port>");
+    argh_range(&p, &port, 1, 65535);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "value '70000' for '--port' is out of range (1 to 65535)");
+    argh_print_help(&p);
+    ASSERT_TRUE(strstr(out_text, "--port <port>") != NULL); /* your metavar wins */
+}
+
+#ifndef NDEBUG
+TEST(test_range_config_errors)
+{
+    static int n;
+    static unsigned u;
+    static bool flag;
+    static const argh_opt reversed[] = {ARGH_INT(0, "n", &n, ""), ARGH_RANGE(&n, 9, 1), ARGH_END};
+    static const argh_opt on_flag[] = {ARGH_FLAG(0, "f", &flag, ""), ARGH_RANGE(&flag, 0, 1), ARGH_END};
+    static const argh_opt negative_unsigned[] = {ARGH_UINT(0, "u", &u, ""), ARGH_RANGE(&u, -1, 5), ARGH_END};
+    static const argh_opt apart[] = {ARGH_INT(0, "n", &n, ""), ARGH_FLAG(0, "f", &flag, ""), ARGH_RANGE(&n, 1, 2), ARGH_END};
+    static const argh_opt implicit_outside[] = {ARGH_INT(0, "n", &n, ""), ARGH_RANGE(&n, 1, 5), ARGH_IMPLICIT(&n, "9"), ARGH_END};
+    const char *text;
+
+    ASSERT_EQ(implicit_config(reversed, &text), ARGH_E_CONFIG);
+    ASSERT_STR_EQ(text, "configuration error: ARGH_RANGE bounds are reversed or outside the variable's type (--n)");
+    ASSERT_EQ(implicit_config(on_flag, &text), ARGH_E_CONFIG);
+    ASSERT_TRUE(strstr(text, "ARGH_RANGE must directly follow an integer option") != NULL);
+    ASSERT_EQ(implicit_config(negative_unsigned, &text), ARGH_E_CONFIG);
+    ASSERT_EQ(implicit_config(apart, &text), ARGH_E_CONFIG);
+    ASSERT_EQ(implicit_config(implicit_outside, &text), ARGH_E_CONFIG);
+    ASSERT_STR_EQ(text, "configuration error: ARGH_IMPLICIT value is not valid for its option (--n)");
+}
+#endif
+
 /* ============================================================================ */
 
 int main(void)
@@ -3294,6 +3426,14 @@ int main(void)
     RUN_TEST(test_implicit_bad_value);
     RUN_TEST(test_implicit_env);
     RUN_TEST(test_implicit_builder_and_help);
+    RUN_TEST(test_range_accepts_bounds);
+    RUN_TEST(test_range_rejects_outside);
+    RUN_TEST(test_range_env);
+    RUN_TEST(test_range_help);
+    RUN_TEST(test_range_builder);
+#ifndef NDEBUG
+    RUN_TEST(test_range_config_errors);
+#endif
 #ifndef NDEBUG
     RUN_TEST(test_implicit_config_errors);
 #endif

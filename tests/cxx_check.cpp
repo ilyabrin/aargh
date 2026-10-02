@@ -19,6 +19,7 @@ static int level;
 static const argh_opt opts[] = {
     ARGH_FLAG('v', "verbose", &verbose, "Verbose output"),
     ARGH_INT('j', "jobs", &jobs, "Parallel jobs"),
+    ARGH_RANGE(&jobs, 1, 64),
     ARGH_STRING('o', "output", &output, "Output file", ARGH_REQUIRED),
     ARGH_ENUM('m', "mode", &mode, modes, "Mode"),
     ARGH_CUSTOM('l', "level", &level, &level_type, "Level"),

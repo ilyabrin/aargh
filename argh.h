@@ -143,7 +143,8 @@ extern "C"
         ARGH__K_GROUP,   /* help section heading */
         ARGH__K_EXAMPLE, /* a command line for help, long_name holds it */
         ARGH__K_ENV,     /* environment variable for target's option, long_name holds it */
-        ARGH__K_IMPLICIT /* value of target's option when given bare, long_name holds it */
+        ARGH__K_IMPLICIT, /* value of target's option when given bare, long_name holds it */
+        ARGH__K_RANGE     /* bounds of target's integer option: extra and metavar hold them */
     };
 
     /* Per-option flags. Stored in argh_opt.flags, combine with |. */
@@ -196,7 +197,8 @@ extern "C"
         unsigned char flags;   /* enum argh_opt_flag */
         void *target;          /* variable the value is written to */
         const void *extra;     /* ARGH__K_ENUM: NULL-terminated choices,
-                                  ARGH__K_CUSTOM: const argh_type * */
+                                  ARGH__K_CUSTOM: const argh_type *,
+                                  ARGH__K_RANGE: the lower bound, cast */
         const char *help;      /* help text, group title for ARGH__K_GROUP */
         const char *metavar;   /* value name in help, NULL for a default */
     } argh_opt;
@@ -395,6 +397,7 @@ extern "C"
      * environment, then the default. */
     ARGH__DEF argh_opt *argh_env(argh_parser *p, void *target, const char *name);
     ARGH__DEF argh_opt *argh_implicit(argh_parser *p, void *target, const char *value);
+    ARGH__DEF argh_opt *argh_range(argh_parser *p, void *target, long lo, long hi);
 
     ARGH__DEF argh_opt *argh_required(argh_opt *opt);
     ARGH__DEF argh_opt *argh_optional(argh_opt *opt);
@@ -524,6 +527,9 @@ extern "C"
 /* Right after an option: makes its value optional. --name alone (or -n)
  * stands for --name=value; another value then needs '=': --name=other. */
 #define ARGH_IMPLICIT(target, value) {0, (value), (unsigned char)ARGH__K_IMPLICIT, 0, (void *)(target), NULL, NULL, NULL}
+/* Right after an integer option: values outside lo..hi (inclusive) are out
+ * of range. The bounds ride in pointer fields, so they need no storage. */
+#define ARGH_RANGE(target, lo, hi) {0, NULL, (unsigned char)ARGH__K_RANGE, 0, (void *)(target), (const void *)(ptrdiff_t)(lo), NULL, (const char *)(ptrdiff_t)(hi)}
 #define ARGH_END {0, NULL, (unsigned char)ARGH__K_END, 0, NULL, NULL, NULL, NULL}
 
     /* ============================================================================
@@ -853,6 +859,29 @@ extern "C"
         return o->kind != ARGH__K_FLAG && o->kind != ARGH__K_COUNT;
     }
 
+    /* ARGH_IMPLICIT and ARGH_RANGE come right after their option, in any
+     * order. Every option has an entry after it (at least ARGH_END), so
+     * finding one costs a read or two, not a search. */
+    static const argh_opt *argh__after(const argh_opt *o, int kind)
+    {
+        const argh_opt *e;
+        /* They are the last kinds: one compare settles the usual case */
+        for (e = o + 1; e->kind >= ARGH__K_IMPLICIT && e->target == o->target; e++)
+            if (e->kind == kind)
+                return e;
+        return NULL;
+    }
+
+    static long argh__range_lo(const argh_opt *r)
+    {
+        return (long)(ptrdiff_t)r->extra;
+    }
+
+    static long argh__range_hi(const argh_opt *r)
+    {
+        return (long)(ptrdiff_t)r->metavar;
+    }
+
     static const argh_opt *argh__find_long(const argh_parser *p, const char *name, size_t len, int *index)
     {
         ARGH__EACH(p, o, i)
@@ -1005,6 +1034,7 @@ extern "C"
      * custom type's parse function need the variable, so they are skipped. */
     static argh_err argh__store(const argh_opt *o, const char *v, bool negated, const char **reason, bool write)
     {
+        const argh_opt *r;
         long l;
         argh__uint u;
 #ifndef ARGH_NO_FLOAT
@@ -1028,27 +1058,31 @@ extern "C"
                 (*(int *)o->target)++;
             return ARGH_E_NONE;
         case ARGH__K_INT:
-            if ((e = argh__parse_long(v, INT_MIN, INT_MAX, &l)) != ARGH_E_NONE)
-                return e;
-            if (write)
-                *(int *)o->target = (int)l;
-            return ARGH_E_NONE;
         case ARGH__K_LONG:
-            if ((e = argh__parse_long(v, LONG_MIN, LONG_MAX, &l)) != ARGH_E_NONE)
+            if (o->kind == ARGH__K_INT)
+                e = argh__parse_long(v, INT_MIN, INT_MAX, &l);
+            else
+                e = argh__parse_long(v, LONG_MIN, LONG_MAX, &l);
+            if (e != ARGH_E_NONE)
                 return e;
-            if (write)
+            if ((r = argh__after(o, ARGH__K_RANGE)) != NULL && (l < argh__range_lo(r) || l > argh__range_hi(r)))
+                return ARGH_E_OUT_OF_RANGE;
+            if (write && o->kind == ARGH__K_INT)
+                *(int *)o->target = (int)l;
+            else if (write)
                 *(long *)o->target = l;
             return ARGH_E_NONE;
         case ARGH__K_UINT:
-            if ((e = argh__parse_uint(v, UINT_MAX, &u)) != ARGH_E_NONE)
-                return e;
-            if (write)
-                *(unsigned *)o->target = (unsigned)u;
-            return ARGH_E_NONE;
         case ARGH__K_SIZE:
-            if ((e = argh__parse_uint(v, SIZE_MAX, &u)) != ARGH_E_NONE)
+            if ((e = argh__parse_uint(v, o->kind == ARGH__K_UINT ? UINT_MAX : SIZE_MAX, &u)) != ARGH_E_NONE)
                 return e;
-            if (write)
+            /* Bounds of an unsigned option are never negative (checked) */
+            if ((r = argh__after(o, ARGH__K_RANGE)) != NULL &&
+                (u < (argh__uint)argh__range_lo(r) || u > (argh__uint)argh__range_hi(r)))
+                return ARGH_E_OUT_OF_RANGE;
+            if (write && o->kind == ARGH__K_UINT)
+                *(unsigned *)o->target = (unsigned)u;
+            else if (write)
                 *(size_t *)o->target = (size_t)u;
             return ARGH_E_NONE;
 #ifndef ARGH_NO_FLOAT
@@ -1133,8 +1167,8 @@ extern "C"
      * option has an entry after it: at least ARGH_END. */
     static const char *argh__implicit(const argh_opt *o)
     {
-        return (argh__takes_value(o) && o[1].kind == ARGH__K_IMPLICIT && o[1].target == o->target) ? o[1].long_name
-                                                                                                    : NULL;
+        const argh_opt *e = argh__takes_value(o) ? argh__after(o, ARGH__K_IMPLICIT) : NULL;
+        return e ? e->long_name : NULL;
     }
 
     static int argh__apply(argh_parser *p, const argh_opt *o, int index, const char *v,
@@ -1861,15 +1895,33 @@ extern "C"
      * the message is printed. --help or --version in an example is fine. */
     /* ARGH_IMPLICIT: directly after its option, which takes a value, has a
      * long name (so a value can still be given with '='), and accepts it */
-    static int argh__check_implicit(argh_parser *p, const argh_opt *table, const argh_opt *e)
+    /* ARGH_IMPLICIT and ARGH_RANGE: right after their option (both may
+     * follow it), and fitting it */
+    static int argh__check_attached(argh_parser *p, const argh_opt *table, const argh_opt *e)
     {
         const char *reason = NULL;
-        const argh_opt *o = e - 1;
-        if (e == table || !argh__is_option_kind(o->kind) || !argh__implicit(o) || !o->long_name)
-            return argh__config_error(p, "ARGH_IMPLICIT must directly follow a value option with a long name, bound to the same variable",
-                                      e == table ? NULL : o);
-        if (!e->long_name || argh__store(o, e->long_name, false, &reason, false) != ARGH_E_NONE)
-            return argh__config_error(p, "ARGH_IMPLICIT value is not valid for its option", o);
+        const argh_opt *o = e;
+        while (o > table && (o->kind == ARGH__K_IMPLICIT || o->kind == ARGH__K_RANGE) && o->target == e->target)
+            o--;
+        if (e->kind == ARGH__K_IMPLICIT)
+        {
+            if (!argh__is_option_kind(o->kind) || o->target != e->target || !argh__implicit(o) || !o->long_name)
+                return argh__config_error(p, "ARGH_IMPLICIT must directly follow a value option with a long name, bound to the same variable",
+                                          argh__is_option_kind(o->kind) ? o : NULL);
+            /* Through the range too, if there is one */
+            if (!e->long_name || argh__store(o, e->long_name, false, &reason, false) != ARGH_E_NONE)
+                return argh__config_error(p, "ARGH_IMPLICIT value is not valid for its option", o);
+            return ARGH__S_OK;
+        }
+        if (!argh__is_option_kind(o->kind) || o->target != e->target ||
+            !(o->kind == ARGH__K_INT || o->kind == ARGH__K_LONG || o->kind == ARGH__K_UINT || o->kind == ARGH__K_SIZE))
+            return argh__config_error(p, "ARGH_RANGE must directly follow an integer option, bound to the same variable",
+                                      argh__is_option_kind(o->kind) ? o : NULL);
+        if (argh__range_lo(e) > argh__range_hi(e) ||
+            (o->kind == ARGH__K_INT && (argh__range_lo(e) < INT_MIN || argh__range_hi(e) > INT_MAX)) ||
+            (o->kind == ARGH__K_UINT && (argh__range_lo(e) < 0 || (unsigned long)argh__range_hi(e) > UINT_MAX)) ||
+            (o->kind == ARGH__K_SIZE && argh__range_lo(e) < 0))
+            return argh__config_error(p, "ARGH_RANGE bounds are reversed or outside the variable's type", o);
         return ARGH__S_OK;
     }
 
@@ -1908,7 +1960,7 @@ extern "C"
                 *bad = t;
                 return ARGH__S_ERROR;
             }
-            if (t->kind == ARGH__K_IMPLICIT && argh__check_implicit(p, table, t) != ARGH__S_OK)
+            if ((t->kind == ARGH__K_IMPLICIT || t->kind == ARGH__K_RANGE) && argh__check_attached(p, table, t) != ARGH__S_OK)
                 return ARGH__S_ERROR;
         }
         return ARGH__S_OK;
@@ -2239,6 +2291,14 @@ extern "C"
         return argh__add(p, 0, value, ARGH__K_IMPLICIT, target, NULL, NULL);
     }
 
+    ARGH__DEF argh_opt *argh_range(argh_parser *p, void *target, long lo, long hi)
+    {
+        argh_opt *o = argh__add(p, 0, NULL, ARGH__K_RANGE, target, (const void *)(ptrdiff_t)lo, NULL);
+        if (o)
+            o->metavar = (const char *)(ptrdiff_t)hi;
+        return o;
+    }
+
     static argh_opt *argh__set_flag(argh_opt *opt, int flag)
     {
         if (opt)
@@ -2421,6 +2481,15 @@ extern "C"
         return NULL;
     }
 
+    /* "1 to 64" in errors, "1..64" in help */
+    static void argh__sb_range(argh__sb *b, const argh_opt *r, const char *between)
+    {
+        char num[24];
+        argh__sb_put(b, argh__fmt_long(num, argh__range_lo(r)));
+        argh__sb_put(b, between);
+        argh__sb_put(b, argh__fmt_long(num, argh__range_hi(r)));
+    }
+
     /* " in NAME" when the value came from the environment, which is when the
      * error has no argv position */
     static void argh__sb_from_env(argh__sb *b, const argh_parser *p, const argh_error *e)
@@ -2563,6 +2632,12 @@ extern "C"
             argh__sb_put(&b, " for '");
             argh__sb_opt_name(&b, e->opt, e->short_name);
             argh__sb_put(&b, "' is out of range");
+            if (argh__after(e->opt, ARGH__K_RANGE))
+            {
+                argh__sb_put(&b, " (");
+                argh__sb_range(&b, argh__after(e->opt, ARGH__K_RANGE), " to ");
+                argh__sb_char(&b, ')');
+            }
             break;
         case ARGH_E_UNEXPECTED_VALUE:
             argh__sb_put(&b, "option '");
@@ -2711,7 +2786,15 @@ extern "C"
         case ARGH__K_LONG:
         case ARGH__K_UINT:
         case ARGH__K_SIZE:
-            argh__sb_put(b, "<n>");
+            /* <1..64> for a range, so help shows the limits */
+            if (!argh__after(o, ARGH__K_RANGE))
+            {
+                argh__sb_put(b, "<n>");
+                break;
+            }
+            argh__sb_char(b, '<');
+            argh__sb_range(b, argh__after(o, ARGH__K_RANGE), "..");
+            argh__sb_char(b, '>');
             break;
         case ARGH__K_DOUBLE:
             argh__sb_put(b, "<x>");
