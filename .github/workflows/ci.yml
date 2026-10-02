@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
         cc: [gcc, clang]
         exclude:
           # gcc on macOS is an alias for clang
@@ -42,6 +42,37 @@ jobs:
           CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g
           -DARGH_NO_COMMANDS -DARGH_NO_SUGGEST -DARGH_NO_STDIO -DARGH_NO_FLOAT -DNDEBUG
           -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+
+  # 32-bit x86: 4-byte long and pointers, the sizes most firmware has
+  x86-32:
+    name: ubuntu / gcc -m32
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      - run: make all test smoke CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O2 -m32"
+
+  # Other architectures under qemu: 32-bit ARM, and big-endian in 64 and
+  # 32 bits. Static binaries run through binfmt like native ones.
+  cross:
+    name: linux / ${{ matrix.arch }} (qemu)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: armhf
+            triplet: arm-linux-gnueabihf
+          - arch: s390x, big-endian
+            triplet: s390x-linux-gnu
+          - arch: powerpc, big-endian 32-bit
+            triplet: powerpc-linux-gnu
+    steps:
+      - uses: actions/checkout@v7
+      - run: sudo apt-get update && sudo apt-get install -y qemu-user-static gcc-${{ matrix.triplet }}
+      - run: >
+          make all test smoke CC=${{ matrix.triplet }}-gcc
+          CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O2 -static"
 
   arm:
     name: arm / cortex-m0, m4 / flash budget
