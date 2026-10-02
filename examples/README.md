@@ -12,7 +12,7 @@ The commands below run in this directory. [data/](data) holds small sample logs,
 | Example                    | What it is                                  | What it shows                                                                                   |
 | -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | [wc.c](wc.c)               | Counts lines, words and bytes, like `wc`    | Flags, a file list, `--help` and `--version` for free, examples in help                         |
-| [logship.c](logship.c)     | Sends log files to a collector              | An option table, help groups, custom types, enums, lists, rules, a validator, `argh_given`      |
+| [logship.c](logship.c)     | Sends log files to a collector              | An option table, help groups, custom types, enums, lists, rules, a validator, `argh_given`, an environment variable |
 | [pkg/](pkg)                | A package manager front end, like `cargo`   | Commands over several files, global options, handlers with a context, a version type, pass-through|
 
 `logship` and `pkg` are dry runs: they do all the checking a real tool would do, then print what they would do instead of touching the network.
@@ -54,7 +54,7 @@ Input:
       --max-size <size>           Skip files larger than this (default: 64M)
 
 Output:
-  -t, --to <host:port>            Collector address (required)
+  -t, --to <host:port>            Collector address [env: LOGSHIP_TO] (required)
   -f, --format <json|syslog|raw>  Record format (default: json)
       --gzip                      Compress with gzip
       --zstd                      Compress with zstd
@@ -152,7 +152,7 @@ Options:
 Global options:
   -v, --verbose         More output, repeat for more
   -C <dir>              Run as if started in this directory (default: .)
-      --registry <url>  Package registry URL
+      --registry <url>  Package registry URL [env: PKG_REGISTRY]
       --offline         Use only the local cache
       --color <auto|always|never>
                         When to use colors (default: auto)

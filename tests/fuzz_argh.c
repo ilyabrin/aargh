@@ -14,6 +14,11 @@
  *   - help and error output are well formed text
  */
 
+/* The environment comes from the input too: with bit 0x80 of the first byte,
+ * FZ_LEVEL and FZ_INCLUDE are set to the first argument */
+static const char *fuzz_env;
+#define ARGH_GETENV(name) (fuzz_env && (name)[0] == 'F' ? fuzz_env : NULL)
+
 #define ARGH_IMPLEMENTATION
 #include "../argh.h"
 
@@ -65,6 +70,8 @@ static const argh_opt table[] = {
     ARGH_FLAG(0, "color", &v.color, "Color", ARGH_NEGATABLE),
     /* Checked on every parse in debug builds; valid with every flag combination */
     ARGH_EXAMPLE("fz -o out -I a --include=b --level 3 --no-color", "An example"),
+    ARGH_ENV(&v.level, "FZ_LEVEL"),
+    ARGH_ENV(&v.include, "FZ_INCLUDE"),
     ARGH_END,
 };
 
@@ -206,6 +213,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
         pos += strlen(buf + pos) + 1;
     }
     argv[argc] = NULL;
+    /* Inside the argv buffer, so the strings-point-into-argv check still holds */
+    fuzz_env = (flags & 0x80) && argc > 1 ? argv[1] : NULL;
     memcpy(before, argv, sizeof(argv[0]) * (size_t)argc);
 
     memset(&v, 0, sizeof(v));
