@@ -130,6 +130,10 @@ return argh_run(&p, NULL);   /* calls the selected command's handler; or switch 
 - Options added to the parser itself are global and work before and after the command name.
 - `tool help <command>` and `tool <command> --help` work automatically.
 
+## Examples in help
+
+Add usage examples with `argh_example(&p, "tool -j 8 data.csv", "What it does")` or `ARGH_EXAMPLE(...)` in any table, including a command's table (then it shows in that command's help). Write the program name first; quotes group words. In builds without `NDEBUG`, `argh_parse` parses every example against the current definitions without writing variables, and fails with `ARGH_E_CONFIG` and a message naming the example if one doesn't work. So when you rename or change an option, update the examples too, and run the program once in a debug build to confirm. Custom-type values, list capacity and the validator are not checked.
+
 ## Rules and validation
 
 ```c

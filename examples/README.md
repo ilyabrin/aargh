@@ -9,7 +9,7 @@ make smoke      # run them and check their output (CI does this on every push)
 
 | Example                    | What it is                                  | What it shows                                                                                   |
 | -------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| [wc.c](wc.c)               | Counts lines, words and bytes, like `wc`    | Flags, a file list, `--help` and `--version` for free                                           |
+| [wc.c](wc.c)               | Counts lines, words and bytes, like `wc`    | Flags, a file list, `--help` and `--version` for free, examples in help                         |
 | [logship.c](logship.c)     | Sends log files to a collector              | An option table, help groups, custom types, enums, lists, rules, a validator, `argh_given`      |
 | [pkg/](pkg)                | A package manager front end, like `cargo`   | Commands over several files, global options, handlers with a context, a version type, pass-through|
 
@@ -70,6 +70,16 @@ TLS:
 
   -h, --help                      Print help
   -V, --version                   Print version
+
+Examples:
+  logship --to logs.example.com:6514 app.log
+      Send one file as JSON
+  logship -t 10.0.0.5:514 -f syslog --gzip -x .gz app.log db.log
+      Syslog records, gzipped, skipping archives
+  logship --stdin --to localhost:9000 --format raw
+      Forward whatever arrives on standard input
+  logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem app.log
+      With a client certificate
 
 $ ./logship --to logs.example.com:6514 --tls-key k.pem --tls-cert c.pem --chunk 1K --gzip -vv -x bench LICENSE SECURITY.md bench/size.sh
   send  LICENSE: 1087 bytes in 2 requests
@@ -147,6 +157,11 @@ Global options:
 
   -h, --help            Print help
   -V, --version         Print version
+
+Examples:
+  pkg remote add origin https://pkgs.example.com
+  pkg remote add -f mirror https://mirror.example.com
+      Replace an existing source
 ```
 
 Rules and the validator mix global and command options, and know which command runs:

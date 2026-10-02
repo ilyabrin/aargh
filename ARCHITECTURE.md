@@ -107,6 +107,10 @@ Table macros take `help` and then optionally `flags` and a value name. C99 has n
 
 Help shows defaults (`(default: 4)`) and some errors include numbers. `snprintf` would pull the printf machinery into firmware, so integers are formatted by `argh__fmt_long` (handles `LONG_MIN` by negating in unsigned arithmetic), and with `ARGH_NO_STDIO` doubles by a small formatter with up to 6 decimals.
 
+### Examples that can't go stale
+
+Usage examples are entries in the option tables (`ARGH__K_EXAMPLE`, with the command line in `long_name`), so they need no field in the parser and a command's table can carry its own. In builds without `NDEBUG`, `argh_parse` first splits each example into words in a buffer on its own stack and runs the normal pipeline on them: scan, command path, positionals, required options, rules. The parser status is set to a checking mode in which `argh__store` converts and checks every value but writes nothing, so your variables keep their defaults. If an example fails, the message is printed while the error can still point into that buffer; then the stored error becomes `ARGH_E_CONFIG` pointing at the example entry, so nothing refers to memory that is gone. In release builds the check is not compiled and the writes are unconditional.
+
 ### Suggestions
 
 "Did you mean" uses the optimal string alignment distance (Levenshtein plus swapped neighbours as one edit), computed with three rows on the stack. A candidate is accepted if it is at most 2 edits away and the edits are at most a third of the longer name, so `ad` suggests `add` but `x` doesn't suggest `xz`. Candidates are only names valid at that point; hidden options are never suggested.
@@ -135,6 +139,8 @@ The decisions that shaped the library, with the reason that settled each one.
 | `argh_set_flags` replaces flags; error code values are stable | Settled at the v1.0 API review so they can be relied on. |
 | No hand-written assembly or SIMD | Considered for `strncmp`: the C library's versions are already vectorized, assembly would break portability, and profiling showed the time went elsewhere. |
 | `ARGH_NO_FLOAT` exists | Measuring a real firmware link showed `strtod` pulling in 27 KB, printf included, out of 38 KB. |
+| Examples in help are checked by parsing them | Documentation that compiles but lies is worse than none; a renamed option should break the build of the docs, not the user's copy-paste. |
+| Examples live in option tables, not in a parser field | Keeps the parser state at 248 bytes and gives commands their own examples for free. |
 
 The full design notes, including alternatives that were rejected, are kept by the maintainer and summarized here.
 

@@ -91,6 +91,8 @@ const argh_opt install_opts[] = {
     ARGH_FLAG('n', "dry-run", &opt.install.dry_run, "Show what would change"),
     ARGH_FLAG(0, "trace-resolve", &opt.install.trace, "Log every resolver step", ARGH_HIDDEN),
     ARGH_REST("packages", &opt.install.packages, "Packages to add; none installs the lockfile"),
+    ARGH_EXAMPLE("pkg install", "Install everything in the lockfile"),
+    ARGH_EXAMPLE("pkg install left-pad lodash --version '>=4 <5'", "Add two packages, one with a version range"),
     ARGH_END
 };
 

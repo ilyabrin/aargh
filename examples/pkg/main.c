@@ -45,6 +45,11 @@ static const argh_opt global_opts[] = {
     ARGH_STRING(0, "registry", &opt.registry, "Package registry URL", 0, "<url>"),
     ARGH_FLAG(0, "offline", &opt.offline, "Use only the local cache"),
     ARGH_ENUM(0, "color", &opt.color, color_modes, "When to use colors"),
+    /* Examples for `pkg --help`; commands have their own. Debug builds check
+     * that every one of them parses, through commands and rules */
+    ARGH_EXAMPLE("pkg install left-pad --version ^1.3 --dev", "Add a development dependency"),
+    ARGH_EXAMPLE("pkg -C ./app --offline install", "Install the lockfile from the local cache"),
+    ARGH_EXAMPLE("pkg exec node --version", "Run a program with the project's packages"),
     ARGH_END
 };
 

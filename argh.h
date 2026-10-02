@@ -127,10 +127,12 @@ extern "C"
         ARGH__K_STRING,  /* const char *:  -o file */
         ARGH__K_ENUM,    /* int (index):   --mode fast */
         ARGH__K_LIST,    /* argh_values:   -I a -I b */
+        ARGH__K_CUSTOM,  /* your type:     --size 10M, see argh_type */
+        /* Options end here: everything from FLAG to CUSTOM is one */
         ARGH__K_POS,     /* const char *:  positional argument */
         ARGH__K_REST,    /* argh_values:   all remaining positionals */
         ARGH__K_GROUP,   /* help section heading */
-        ARGH__K_CUSTOM   /* your type:     --size 10M, see argh_type */
+        ARGH__K_EXAMPLE  /* a command line for help, long_name holds it */
     };
 
     /* Per-option flags. Stored in argh_opt.flags, combine with |. */
@@ -372,6 +374,9 @@ extern "C"
     ARGH__DEF argh_opt *argh_custom(argh_parser *p, char short_name, const char *long_name, void *target,
                           const argh_type *type, const char *help);
     ARGH__DEF argh_opt *argh_group(argh_parser *p, const char *title);
+    /* A usage example for help, starting with the program name. Without
+     * NDEBUG, argh_parse checks that it parses with the current options. */
+    ARGH__DEF argh_opt *argh_example(argh_parser *p, const char *command, const char *help);
 
     ARGH__DEF argh_opt *argh_required(argh_opt *opt);
     ARGH__DEF argh_opt *argh_optional(argh_opt *opt);
@@ -491,6 +496,8 @@ extern "C"
             ARGH__THIRD(__VA_ARGS__)                                                                \
     }
 #define ARGH_GROUP(title) {0, NULL, (unsigned char)ARGH__K_GROUP, 0, NULL, NULL, (title), NULL}
+/* A usage example shown in help; checked to parse in builds without NDEBUG */
+#define ARGH_EXAMPLE(command, help) {0, (command), (unsigned char)ARGH__K_EXAMPLE, 0, NULL, NULL, (help), NULL}
 #define ARGH_END {0, NULL, (unsigned char)ARGH__K_END, 0, NULL, NULL, NULL, NULL}
 
     /* ============================================================================
@@ -562,8 +569,17 @@ extern "C"
         ARGH__S_OK,
         ARGH__S_HELP,
         ARGH__S_VERSION,
-        ARGH__S_ERROR
+        ARGH__S_ERROR,
+        ARGH__S_CHECKING /* parsing an example: check everything, write nothing */
     };
+
+/* Values reach your variables except while an example is checked. Release
+ * builds never check examples, so the test disappears there. */
+#ifndef NDEBUG
+#define ARGH__WRITING(p) ((p)->argh__status != ARGH__S_CHECKING)
+#else
+#define ARGH__WRITING(p) 1
+#endif
 
 /* Widest left column in help before descriptions move to the next line */
 #define ARGH__HELP_COLUMN_MAX 30
@@ -764,7 +780,7 @@ extern "C"
 
     static bool argh__is_option_kind(int kind)
     {
-        return kind != ARGH__K_POS && kind != ARGH__K_REST && kind != ARGH__K_GROUP;
+        return kind >= ARGH__K_FLAG && kind <= ARGH__K_CUSTOM;
     }
 
     static bool argh__takes_value(const argh_opt *o)
@@ -910,7 +926,10 @@ extern "C"
 
     /* Converts and stores one value. v is NULL for flags and counters. */
     /* reason: set to the argh_type's explanation when a custom parse fails */
-    static argh_err argh__store(const argh_opt *o, const char *v, bool negated, const char **reason)
+    /* write is false while an example is checked: values are converted and
+     * checked, but nothing reaches the variables. A list's capacity and a
+     * custom type's parse function need the variable, so they are skipped. */
+    static argh_err argh__store(const argh_opt *o, const char *v, bool negated, const char **reason, bool write)
     {
         long l;
 #ifndef ARGH_NO_FLOAT
@@ -923,37 +942,39 @@ extern "C"
         {
         case ARGH__K_FLAG:
             if (!v)
-            {
-                *(bool *)o->target = !negated;
-                return ARGH_E_NONE;
-            }
-            if ((e = argh__parse_bool(v, &b)) != ARGH_E_NONE)
+                b = !negated;
+            else if ((e = argh__parse_bool(v, &b)) != ARGH_E_NONE)
                 return e;
-            *(bool *)o->target = b;
+            if (write)
+                *(bool *)o->target = b;
             return ARGH_E_NONE;
         case ARGH__K_COUNT:
-            if (*(int *)o->target < INT_MAX)
+            if (write && *(int *)o->target < INT_MAX)
                 (*(int *)o->target)++;
             return ARGH_E_NONE;
         case ARGH__K_INT:
             if ((e = argh__parse_long(v, INT_MIN, INT_MAX, &l)) != ARGH_E_NONE)
                 return e;
-            *(int *)o->target = (int)l;
+            if (write)
+                *(int *)o->target = (int)l;
             return ARGH_E_NONE;
         case ARGH__K_LONG:
             if ((e = argh__parse_long(v, LONG_MIN, LONG_MAX, &l)) != ARGH_E_NONE)
                 return e;
-            *(long *)o->target = l;
+            if (write)
+                *(long *)o->target = l;
             return ARGH_E_NONE;
 #ifndef ARGH_NO_FLOAT
         case ARGH__K_DOUBLE:
             if ((e = argh__parse_double(v, &d)) != ARGH_E_NONE)
                 return e;
-            *(double *)o->target = d;
+            if (write)
+                *(double *)o->target = d;
             return ARGH_E_NONE;
 #endif
         case ARGH__K_STRING:
-            *(const char **)o->target = v;
+            if (write)
+                *(const char **)o->target = v;
             return ARGH_E_NONE;
         case ARGH__K_ENUM:
         {
@@ -963,7 +984,8 @@ extern "C"
             {
                 if (strcmp(choices[i], v) == 0)
                 {
-                    *(int *)o->target = i;
+                    if (write)
+                        *(int *)o->target = i;
                     return ARGH_E_NONE;
                 }
             }
@@ -972,12 +994,16 @@ extern "C"
         case ARGH__K_LIST:
         {
             argh_values *list = (argh_values *)o->target;
+            if (!write)
+                return ARGH_E_NONE;
             if (list->count >= list->capacity)
                 return ARGH_E_TOO_MANY_VALUES;
             list->items[list->count++] = v;
             return ARGH_E_NONE;
         }
         case ARGH__K_CUSTOM:
+            if (!write)
+                return ARGH_E_NONE;
             *reason = ((const argh_type *)o->extra)->parse(v, o->target);
             return *reason ? ARGH_E_INVALID_VALUE : ARGH_E_NONE;
         default:
@@ -1022,7 +1048,7 @@ extern "C"
         const char *reason = NULL;
         if ((o->flags & ARGH_ONCE) && argh__seen(p, index))
             return argh__fail(p, ARGH_E_REPEATED, argi, o, NULL, short_name);
-        e = argh__store(o, v, negated, &reason);
+        e = argh__store(o, v, negated, &reason, ARGH__WRITING(p));
         if (e != ARGH_E_NONE)
         {
             p->argh__error.detail = reason;
@@ -1244,7 +1270,9 @@ extern "C"
             {
                 if (used < count)
                 {
-                    *(const char **)o->target = argv[1 + used++];
+                    if (ARGH__WRITING(p))
+                        *(const char **)o->target = argv[1 + used];
+                    used++;
                     argh__mark(p, index);
                 }
                 else if (!(o->flags & ARGH_OPTIONAL))
@@ -1254,12 +1282,16 @@ extern "C"
             }
             else if (o->kind == ARGH__K_REST)
             {
-                argh_values *rest = (argh_values *)o->target;
-                rest->items = (const char **)(void *)(argv + 1 + used);
-                rest->count = count - used;
-                rest->capacity = rest->count;
+                int n = count - used;
+                if (ARGH__WRITING(p))
+                {
+                    argh_values *rest = (argh_values *)o->target;
+                    rest->items = (const char **)(void *)(argv + 1 + used);
+                    rest->count = n;
+                    rest->capacity = n;
+                }
                 used = count;
-                if (rest->count > 0)
+                if (n > 0)
                     argh__mark(p, index);
                 else if (o->flags & ARGH_REQUIRED)
                     return argh__fail(p, ARGH_E_MISSING_REQUIRED, -1, o, NULL, 0);
@@ -1600,7 +1632,7 @@ extern "C"
                 if (clash)
                     return argh__config_error(p, "name reserved for help/version, see ARGH_NO_AUTO_HELP", o);
             }
-            if (!o->target && o->kind != ARGH__K_GROUP)
+            if (!o->target && o->kind != ARGH__K_GROUP && o->kind != ARGH__K_EXAMPLE)
                 return argh__config_error(p, "option has no target variable", o);
             if (o->kind == ARGH__K_CUSTOM && (!o->extra || !((const argh_type *)o->extra)->parse))
                 return argh__config_error(p, "custom option has no argh_type with a parse function", o);
@@ -1643,6 +1675,145 @@ extern "C"
             return argh__fail(p, ARGH_E_MISSING_COMMAND, -1, NULL, NULL, 0);
         return argh__check_duplicates(p);
     }
+
+#ifndef NDEBUG
+/* Longest example and most words in one, for the copy argh_parse checks */
+#define ARGH__EXAMPLE_LEN 256
+#define ARGH__EXAMPLE_WORDS 32
+
+    /* Splits a command line into words, written to buf: spaces separate
+     * words, '...' and "..." keep spaces inside one. Returns the number of
+     * words, or -1 if the line doesn't fit or a quote is left open. */
+    static int argh__split(const char *s, char *buf, size_t size, char **words, int max)
+    {
+        size_t n = 0;
+        int count = 0;
+        for (;;)
+        {
+            char quote = 0;
+            while (*s == ' ')
+                s++;
+            if (!*s)
+                break;
+            if (count == max)
+                return -1;
+            words[count++] = buf + n;
+            for (; *s && (quote || *s != ' '); s++)
+            {
+                if (!quote && (*s == '"' || *s == '\''))
+                    quote = *s;
+                else if (quote && *s == quote)
+                    quote = 0;
+                else if (n + 1 < size)
+                    buf[n++] = *s;
+                else
+                    return -1;
+            }
+            if (quote || n + 1 >= size)
+                return -1;
+            buf[n++] = '\0';
+        }
+        words[count] = NULL;
+        return count;
+    }
+
+    /* Parses one example like a real command line, writing to no variable.
+     * buf belongs to argh_parse, so an error can still point into it while
+     * the message is printed. --help or --version in an example is fine. */
+    static int argh__check_example(argh_parser *p, const argh_opt *ex, char *buf)
+    {
+        char *words[ARGH__EXAMPLE_WORDS + 1];
+        int count = argh__split(ex->long_name, buf, ARGH__EXAMPLE_LEN, words, ARGH__EXAMPLE_WORDS);
+        int positional_count = 0;
+        int st;
+
+        if (count < 1)
+            return argh__config_error(p, "an example needs at most 256 characters, 32 words and closed quotes", ex);
+        /* The first word is the program name, as in argv */
+        memset(p->argh__seen, 0, sizeof(p->argh__seen));
+        p->argh__status = ARGH__S_CHECKING;
+        st = argh__scan(p, count, words, true, &positional_count);
+        if (st == ARGH__S_OK)
+            st = argh__check_path(p);
+        if (st == ARGH__S_OK)
+            st = argh__assign_positionals(p, words, positional_count);
+        if (st == ARGH__S_OK)
+            st = argh__check_required(p);
+        if (st == ARGH__S_OK)
+            st = p->argh__rule_check ? p->argh__rule_check(p) : ARGH__S_OK;
+        p->argh__status = ARGH__S_READY;
+        return st == ARGH__S_ERROR ? st : ARGH__S_OK;
+    }
+
+    static int argh__check_examples_in(argh_parser *p, const argh_opt *t, char *buf, const argh_opt **bad)
+    {
+        for (; t && t->kind != ARGH__K_END; t++)
+        {
+            if (t->kind == ARGH__K_EXAMPLE && argh__check_example(p, t, buf) != ARGH__S_OK)
+            {
+                *bad = t;
+                return ARGH__S_ERROR;
+            }
+        }
+        return ARGH__S_OK;
+    }
+
+#ifndef ARGH_NO_COMMANDS
+    static int argh__check_examples_tree(argh_parser *p, const argh_cmd *c, char *buf, const argh_opt **bad)
+    {
+        for (; c && c->name; c++)
+        {
+            if (argh__check_examples_in(p, c->opts, buf, bad) != ARGH__S_OK ||
+                argh__check_examples_tree(p, c->subs, buf, bad) != ARGH__S_OK)
+                return ARGH__S_ERROR;
+        }
+        return ARGH__S_OK;
+    }
+#endif
+
+    /* Checks the examples in the program's tables and in every command */
+    static int argh__check_examples(argh_parser *p, char *buf, const argh_opt **bad)
+    {
+        int st = ARGH__S_OK;
+        int t;
+        for (t = 0; t < p->argh__table_count && st == ARGH__S_OK; t++)
+            st = argh__check_examples_in(p, p->argh__tables[t], buf, bad);
+#ifndef ARGH_NO_COMMANDS
+        if (st == ARGH__S_OK)
+            st = argh__check_examples_tree(p, p->argh__commands, buf, bad);
+#endif
+        if (st != ARGH__S_OK)
+            return st;
+        /* Leave nothing behind for the real parse */
+        memset(p->argh__seen, 0, sizeof(p->argh__seen));
+        memset(&p->argh__error, 0, sizeof(p->argh__error));
+        p->argh__error.argv_index = -1;
+#ifndef ARGH_NO_COMMANDS
+        p->argh__depth = 0;
+#endif
+        return ARGH__S_OK;
+    }
+
+    /* Prints why an example fails while the error can still point into the
+     * example's copy, then keeps it as a configuration error that names the
+     * example and points to nothing temporary */
+    static void argh__report_example(argh_parser *p, const argh_opt *ex)
+    {
+        char message[256];
+        size_t n = argh_format_error(p, message, sizeof(message));
+        argh__out(p, 1, p->argh__name);
+        argh__out(p, 1, ": example '");
+        argh__out(p, 1, ex->long_name);
+        argh__out(p, 1, "' does not work: ");
+        argh__outn(p, 1, message, n < sizeof(message) ? n : sizeof(message) - 1);
+        argh__out(p, 1, "\n");
+        memset(&p->argh__error, 0, sizeof(p->argh__error));
+        p->argh__error.code = ARGH_E_CONFIG;
+        p->argh__error.argv_index = -1;
+        p->argh__error.opt = ex;
+        p->argh__error.detail = "this example does not work";
+    }
+#endif
 
     /* Cheap check whether a dry pass for help/version is worth running */
     static bool argh__may_want_help(const argh_parser *p, int argc, char **argv)
@@ -1887,6 +2058,11 @@ extern "C"
         return argh__add(p, 0, NULL, ARGH__K_GROUP, NULL, NULL, title);
     }
 
+    ARGH__DEF argh_opt *argh_example(argh_parser *p, const char *command, const char *help)
+    {
+        return argh__add(p, 0, command, ARGH__K_EXAMPLE, NULL, NULL, help);
+    }
+
     static argh_opt *argh__set_flag(argh_opt *opt, int flag)
     {
         if (opt)
@@ -1915,6 +2091,10 @@ extern "C"
     {
         int positional_count = 0;
         int st;
+#ifndef NDEBUG
+        char example[ARGH__EXAMPLE_LEN];
+        const argh_opt *bad_example = NULL;
+#endif
 
         memset(p->argh__seen, 0, sizeof(p->argh__seen));
         memset(&p->argh__error, 0, sizeof(p->argh__error));
@@ -1926,6 +2106,10 @@ extern "C"
         p->argh__depth = 0;
 #endif
         st = argh__check_config(p);
+#ifndef NDEBUG
+        if (st == ARGH__S_OK)
+            st = argh__check_examples(p, example, &bad_example);
+#endif
         if (st == ARGH__S_OK && argh__may_want_help(p, argc, argv))
         {
             st = argh__scan(p, argc, argv, false, &positional_count);
@@ -1968,6 +2152,13 @@ extern "C"
             argh__out(p, 0, "\n");
             return false;
         default:
+#ifndef NDEBUG
+            if (bad_example)
+            {
+                argh__report_example(p, bad_example);
+                return false;
+            }
+#endif
             argh__print_error(p);
             return false;
         }
@@ -2038,7 +2229,13 @@ extern "C"
      * positionals. used_short: the short name the user typed, if any. */
     static void argh__sb_opt_name(argh__sb *b, const argh_opt *o, char used_short)
     {
-        if (o && (o->kind == ARGH__K_POS || o->kind == ARGH__K_REST))
+        if (o && o->kind == ARGH__K_EXAMPLE)
+        {
+            argh__sb_put(b, "example '");
+            argh__sb_put(b, o->long_name);
+            argh__sb_char(b, '\'');
+        }
+        else if (o && (o->kind == ARGH__K_POS || o->kind == ARGH__K_REST))
         {
             argh__sb_char(b, '<');
             argh__sb_put(b, o->long_name);
@@ -2469,7 +2666,7 @@ extern "C"
         {
             size_t len;
             (void)index;
-            if (o->kind == ARGH__K_GROUP || (o->flags & ARGH_HIDDEN))
+            if (o->kind == ARGH__K_GROUP || o->kind == ARGH__K_EXAMPLE || (o->flags & ARGH_HIDDEN))
                 continue;
             if (slot < own_slot && !argh__is_option_kind(o->kind))
                 continue;
@@ -2594,6 +2791,29 @@ extern "C"
                     argh__help_line(p, "    --version", 13, "Print version", column, NULL);
                 else if (short_free)
                     argh__help_line(p, "-V", 2, "Print version", column, NULL);
+            }
+        }
+
+        /* Examples from this level's own tables: the program's, or the command's */
+        {
+            bool first = true;
+            ARGH__EACH_T(p, slot, o, index)
+            {
+                (void)index;
+                if (slot < own_slot || o->kind != ARGH__K_EXAMPLE)
+                    continue;
+                if (first)
+                    argh__out(p, 0, "\nExamples:\n");
+                first = false;
+                argh__out(p, 0, "  ");
+                argh__out(p, 0, o->long_name);
+                argh__out(p, 0, "\n");
+                if (o->help)
+                {
+                    argh__out(p, 0, "      ");
+                    argh__out(p, 0, o->help);
+                    argh__out(p, 0, "\n");
+                }
             }
         }
     }

@@ -98,6 +98,12 @@ static void setup(argh_parser *p)
 #else
 #define DID_YOU_MEAN(name) " (did you mean '" name "'?)"
 #endif
+/* Command suggestions have no dashes */
+#ifdef ARGH_NO_SUGGEST
+#define CMD_DID_YOU_MEAN(name) ""
+#else
+#define CMD_DID_YOU_MEAN(name) " (did you mean '" name "'?)"
+#endif
 
 /* The one-line error message of the last parse */
 static const char *error_text(const argh_parser *p)
@@ -2156,6 +2162,286 @@ TEST(test_suggest_on_command_path)
 #endif /* ARGH_NO_COMMANDS */
 #endif /* ARGH_NO_SUGGEST */
 
+/* ============================================================================
+ * Examples in help
+ * ============================================================================ */
+
+static int ex_jobs;
+static bool ex_verbose;
+static const char *ex_name;
+static const char *ex_in;
+static const char *ex_inc_buf[2];
+static argh_values ex_inc;
+
+static const argh_opt ex_opts[] = {
+    ARGH_FLAG('v', "verbose", &ex_verbose, "Verbose output"),
+    ARGH_INT('j', "jobs", &ex_jobs, "Parallel jobs"),
+    ARGH_STRING('n', "name", &ex_name, "Name"),
+    ARGH_LIST('I', "include", &ex_inc, "Include dir"),
+    ARGH_POS("input", &ex_in, "Input file", ARGH_OPTIONAL),
+    ARGH_EXAMPLE("prog -j 8 in.txt", "Eight jobs"),
+    ARGH_EXAMPLE("prog -v --name 'two words' -I a -I b -I c", NULL),
+    ARGH_END,
+};
+
+static void setup_examples(argh_parser *p)
+{
+    ex_jobs = 4;
+    ex_verbose = false;
+    ex_name = "default";
+    ex_in = NULL;
+    ex_inc.items = ex_inc_buf;
+    ex_inc.count = 0;
+    ex_inc.capacity = 2;
+    setup(p);
+    argh_table(p, ex_opts);
+}
+
+TEST(test_example_in_help)
+{
+    ARGV("--help");
+    argh_parser p;
+    setup_examples(&p);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_exit_code(&p), 0);
+    /* Last in help, after the built-in options, and not listed as options */
+    ASSERT_TRUE(strstr(out_text, "  -h, --help             Print help\n"
+                                 "\n"
+                                 "Examples:\n"
+                                 "  prog -j 8 in.txt\n"
+                                 "      Eight jobs\n"
+                                 "  prog -v --name 'two words' -I a -I b -I c\n") != NULL);
+    ASSERT_STR_EQ(out_text + strlen(out_text) - strlen("-I c\n"), "-I c\n");
+    ASSERT_TRUE(strstr(out_text, "--prog") == NULL);
+}
+
+TEST(test_example_builder)
+{
+    ARGV("--help");
+    int jobs = 1;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "Jobs");
+    argh_example(&p, "prog -j 2", "Two jobs");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "Examples:\n  prog -j 2\n      Two jobs\n") != NULL);
+}
+
+TEST(test_no_examples_no_section)
+{
+    ARGV("--help");
+    int jobs = 1;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "Jobs");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "Examples") == NULL);
+}
+
+#ifndef NDEBUG
+/* Examples are parsed in full but write to no variable: -j 8, -v, --name,
+ * the include list (three values with room for two) and the positional
+ * keep their values from before argh_parse */
+TEST(test_example_checked_writes_nothing)
+{
+    ARGV0();
+    argh_parser p;
+    setup_examples(&p);
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(ex_jobs, 4);
+    ASSERT_FALSE(ex_verbose);
+    ASSERT_STR_EQ(ex_name, "default");
+    ASSERT_EQ(ex_inc.count, 0);
+    ASSERT_TRUE(ex_in == NULL);
+    ASSERT_FALSE(argh_given(&p, &ex_jobs));
+    ASSERT_STR_EQ(err_text, "");
+}
+
+/* Parses with a table plus one example, returns what went to stderr */
+static const char *example_error(argh_parser *p, const char *example)
+{
+    static argh_opt table[2];
+    static const argh_opt end = ARGH_END;
+    char *argv[] = {(char *)"prog", NULL};
+    argh_opt ex = ARGH_EXAMPLE(NULL, NULL);
+    ex.long_name = example;
+    table[0] = ex;
+    table[1] = end;
+    argh_table(p, table);
+    reset_output();
+    argh_parse(p, 1, argv);
+    return err_text;
+}
+
+TEST(test_example_broken_option)
+{
+    int jobs = 1;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "Jobs");
+
+    ASSERT_STR_EQ(example_error(&p, "prog --jbos 8"),
+                  "prog: example 'prog --jbos 8' does not work: unknown option '--jbos'" DID_YOU_MEAN("--jobs") "\n");
+    ASSERT_EQ(argh_exit_code(&p), 2);
+    /* Afterwards it is a definition mistake that names the example */
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_CONFIG);
+    ASSERT_STR_EQ(error_text(&p), "configuration error: this example does not work (example 'prog --jbos 8')");
+    ASSERT_TRUE(argh_last_error(&p)->value == NULL);
+}
+
+TEST(test_example_broken_value)
+{
+    int jobs = 1;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "Jobs");
+
+    ASSERT_STR_EQ(example_error(&p, "prog -j many"),
+                  "prog: example 'prog -j many' does not work: invalid value 'many' for '-j': expected an integer\n");
+    ASSERT_EQ(jobs, 1);
+}
+
+TEST(test_example_missing_required)
+{
+    const char *out = NULL;
+    bool force = false;
+    argh_parser p;
+    setup(&p);
+    argh_required(argh_string(&p, 'o', "out", &out, "Output"));
+    argh_flag(&p, 'f', "force", &force, "Force");
+
+    ASSERT_STR_EQ(example_error(&p, "prog -f"),
+                  "prog: example 'prog -f' does not work: missing required option '--out'\n");
+}
+
+TEST(test_example_extra_argument)
+{
+    const char *in = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_pos(&p, "input", &in, "Input");
+
+    ASSERT_STR_EQ(example_error(&p, "prog a.txt b.txt"),
+                  "prog: example 'prog a.txt b.txt' does not work: unexpected argument 'b.txt'\n");
+    ASSERT_TRUE(in == NULL);
+}
+
+static bool ex_json, ex_yaml;
+static const argh_rule ex_rules[] = {ARGH_AT_MOST_ONE(&ex_json, &ex_yaml), ARGH_RULES_END};
+
+TEST(test_example_breaks_rule)
+{
+    argh_parser p;
+    setup(&p);
+    argh_flag(&p, 0, "json", &ex_json, "JSON");
+    argh_flag(&p, 0, "yaml", &ex_yaml, "YAML");
+    argh_rules(&p, ex_rules);
+
+    ASSERT_STR_EQ(example_error(&p, "prog --json --yaml"),
+                  "prog: example 'prog --json --yaml' does not work: options '--json' and '--yaml' cannot be used together\n");
+}
+
+TEST(test_example_quotes)
+{
+    const char *name = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_string(&p, 'n', "name", &name, "Name");
+
+    ASSERT_STR_EQ(example_error(&p, "prog --name \"open"),
+                  "prog: example 'prog --name \"open' does not work: configuration error: an example needs at most 256 "
+                  "characters, 32 words and closed quotes (example 'prog --name \"open')\n");
+}
+
+TEST(test_example_help_is_fine)
+{
+    int jobs = 1;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "Jobs");
+
+    ASSERT_STR_EQ(example_error(&p, "prog --help"), "");
+    ASSERT_EQ(argh_exit_code(&p), 0);
+}
+
+#ifndef ARGH_NO_COMMANDS
+static const char *exc_name, *exc_url;
+static const argh_opt exc_add_opts[] = {
+    ARGH_POS("name", &exc_name, "Name"),
+    ARGH_POS("url", &exc_url, "URL"),
+    ARGH_EXAMPLE("tool remote add origin https://example.com", "Add a remote"),
+    ARGH_END,
+};
+static const argh_cmd exc_remote[] = {ARGH_CMD("add", "Add a remote", exc_add_opts), ARGH_CMD_END};
+static const argh_cmd exc_cmds[] = {ARGH_CMD_GROUP("remote", "Remotes", exc_remote), ARGH_CMD_END};
+static const argh_opt exc_top[] = {ARGH_EXAMPLE("tool remote add o u", "Top-level example"), ARGH_END};
+
+TEST(test_example_per_command)
+{
+    char *top[] = {(char *)"tool", (char *)"--help", NULL};
+    char *sub[] = {(char *)"tool", (char *)"remote", (char *)"add", (char *)"--help", NULL};
+    argh_parser p;
+
+    /* The program's help shows the program's examples */
+    argh_init(&p, "tool", NULL);
+    argh_set_writer(&p, capture, NULL);
+    argh_table(&p, exc_top);
+    argh_commands(&p, exc_cmds);
+    ASSERT_FALSE(argh_parse(&p, 2, top));
+    ASSERT_TRUE(strstr(out_text, "Examples:\n  tool remote add o u\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "origin") == NULL);
+
+    /* A command's help shows its own */
+    reset_output();
+    argh_init(&p, "tool", NULL);
+    argh_set_writer(&p, capture, NULL);
+    argh_table(&p, exc_top);
+    argh_commands(&p, exc_cmds);
+    ASSERT_FALSE(argh_parse(&p, 4, sub));
+    ASSERT_TRUE(strstr(out_text, "Examples:\n  tool remote add origin https://example.com\n      Add a remote\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "Top-level") == NULL);
+    ASSERT_TRUE(exc_name == NULL && exc_url == NULL);
+}
+
+static const argh_opt exc_bad_opts[] = {
+    ARGH_POS("name", &exc_name, "Name"),
+    ARGH_EXAMPLE("tool remote ad x", NULL),
+    ARGH_END,
+};
+static const argh_cmd exc_bad_remote[] = {ARGH_CMD("add", "Add", exc_bad_opts), ARGH_CMD_END};
+static const argh_cmd exc_bad_cmds[] = {ARGH_CMD_GROUP("remote", "Remotes", exc_bad_remote), ARGH_CMD_END};
+
+/* Examples inside commands are checked too */
+TEST(test_example_in_command_checked)
+{
+    char *argv[] = {(char *)"tool", NULL};
+    argh_parser p;
+    argh_init(&p, "tool", NULL);
+    argh_set_writer(&p, capture, NULL);
+    argh_commands(&p, exc_bad_cmds);
+
+    ASSERT_FALSE(argh_parse(&p, 1, argv));
+    ASSERT_STR_EQ(err_text, "tool: example 'tool remote ad x' does not work: unknown command 'ad'" CMD_DID_YOU_MEAN("add") "\n");
+}
+#endif /* ARGH_NO_COMMANDS */
+#else
+/* Release builds don't check examples */
+TEST(test_example_not_checked_in_release)
+{
+    char *argv[] = {(char *)"prog", NULL};
+    static const argh_opt table[] = {ARGH_EXAMPLE("prog --no-such-option", NULL), ARGH_END};
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, table);
+
+    ASSERT_TRUE(argh_parse(&p, 1, argv));
+}
+#endif /* NDEBUG */
+
 TEST(test_parser_size)
 {
     /* Budget from the design: the core stays small, the builder is extra */
@@ -2359,6 +2645,25 @@ int main(void)
 #endif
 #if !defined(ARGH_NO_SUGGEST) && !defined(ARGH_NO_COMMANDS)
     RUN_TEST(test_suggest_on_command_path);
+#endif
+    RUN_TEST(test_example_in_help);
+    RUN_TEST(test_example_builder);
+    RUN_TEST(test_no_examples_no_section);
+#ifndef NDEBUG
+    RUN_TEST(test_example_checked_writes_nothing);
+    RUN_TEST(test_example_broken_option);
+    RUN_TEST(test_example_broken_value);
+    RUN_TEST(test_example_missing_required);
+    RUN_TEST(test_example_extra_argument);
+    RUN_TEST(test_example_breaks_rule);
+    RUN_TEST(test_example_quotes);
+    RUN_TEST(test_example_help_is_fine);
+#ifndef ARGH_NO_COMMANDS
+    RUN_TEST(test_example_per_command);
+    RUN_TEST(test_example_in_command_checked);
+#endif
+#else
+    RUN_TEST(test_example_not_checked_in_release);
 #endif
     RUN_TEST(test_parser_size);
 
