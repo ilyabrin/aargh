@@ -120,12 +120,12 @@ def check_code(path, text):
     return count
 
 
-def run(exe, args):
-    r = subprocess.run([exe] + args, cwd=ROOT, capture_output=True, text=True)
+def run(exe, args, cwd=ROOT):
+    r = subprocess.run([exe] + args, cwd=cwd, capture_output=True, text=True)
     return r.returncode, (r.stdout + r.stderr).replace('\r\n', '\n').rstrip('\n')
 
 
-def check_console(path, text, binaries, mapping=None):
+def check_console(path, text, binaries, mapping=None, cwd=ROOT):
     count = 0
     for kind, body, marker, line in blocks(text):
         if kind != 'console':
@@ -166,7 +166,7 @@ def check_console(path, text, binaries, mapping=None):
             if name not in binaries:
                 fail('%s:%d: %s was not built' % (path, at, name))
                 continue
-            last_rc, got = run(binaries[name], argv[1:])
+            last_rc, got = run(binaries[name], argv[1:], cwd)
             count += 1
             if got != expected:
                 fail('%s:%d: output of "%s" differs\n--- documented\n%s\n--- real\n%s' % (path, at, cmd, expected, got))
@@ -222,7 +222,8 @@ def check_llms(cc, out):
         path = os.path.join(out, name)
         with open(path, 'w') as f:
             f.write(code)
-        r = subprocess.run([cc] + CFLAGS + ['-I', ROOT, '-o', path + EXE, path], capture_output=True, text=True)
+        exe = os.path.splitext(path)[0] + EXE
+        r = subprocess.run([cc] + CFLAGS + ['-I', ROOT, '-o', exe, path], capture_output=True, text=True)
         if r.returncode != 0:
             fail('llms.txt: %s does not compile:\n%s' % (name, r.stdout + r.stderr))
     return len(snippets)
@@ -240,7 +241,8 @@ def main():
         check_marked('README.md', readme)
         code = check_code('README.md', readme)
         output = check_console('README.md', readme, binaries)
-        output += check_console('examples/README.md', examples, binaries, EXAMPLES_MAP)
+        # Its commands run in examples/, next to the programs and data/
+        output += check_console('examples/README.md', examples, binaries, EXAMPLES_MAP, os.path.join(ROOT, 'examples'))
         for name, args in RUNS:
             if name in binaries:
                 rc, got = run(binaries[name], args)

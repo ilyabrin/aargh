@@ -1,7 +1,7 @@
 /*
  * wc: count lines, words and bytes, like the Unix tool.
  *
- *   $ ./wc LICENSE SECURITY.md
+ *   $ ./wc data/app.log data/db.log
  *   $ ./wc -l argh.h
  *   $ cat argh.h | ./wc -w
  *
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
     argh_flag(&p, 'c', "bytes", &show_bytes, "Count bytes");
     argh_rest(&p, "files", &files, "Files to read, '-' for standard input");
     /* Shown at the end of --help; debug builds check that they parse */
-    argh_example(&p, "wc LICENSE README.md", "Lines, words and bytes of two files, and a total");
+    argh_example(&p, "wc data/app.log data/db.log", "Lines, words and bytes of two files, and a total");
     argh_example(&p, "wc -l src/main.c src/util.c", "Only count lines");
 
     if (!argh_parse(&p, argc, argv))

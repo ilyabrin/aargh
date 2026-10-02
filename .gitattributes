@@ -1,2 +1,6 @@
 # Shell scripts must keep LF endings, or sh fails on Windows runners
 *.sh text eol=lf
+
+# Sample files for the examples: same bytes on every platform, so the
+# documented output of wc and logship holds everywhere
+examples/data/* text eol=lf
