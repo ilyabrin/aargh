@@ -6,13 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-03
+
 ### Added
 
 - Unsigned options: `argh_uint` / `ARGH_UINT` for `unsigned` and `argh_size` / `ARGH_SIZE` for `size_t`. They take the same decimal and `0x` forms as `int`. A minus sign is an error (`expected a non-negative integer`) instead of wrapping around to a huge value as `strtoul` does, and values past the type's maximum are out of range.
 
 ### Changed
 
-- Integers are parsed by argh's own digit loop instead of `strtol`. Same rules and messages; firmware images are about 270 bytes smaller even with the new types.
+- Integers are parsed by argh's own digit loop instead of `strtol`. Same rules and messages. Parsing is about 7% faster, and firmware images are about 290 bytes smaller even with the new types; desktop builds grow by 0.2 to 0.6 KB, where `strtol` comes from the shared C library anyway.
 
 ## [1.3.0] - 2026-10-02
 
@@ -182,7 +184,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/ilyabrin/argh/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ilyabrin/argh/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/ilyabrin/argh/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/ilyabrin/argh/compare/v1.0.0...v1.1.0

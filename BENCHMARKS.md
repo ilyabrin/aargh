@@ -38,8 +38,9 @@ On one machine (Intel Core i5-12400F, Windows 11, MinGW GCC 13.2), best of 9 alt
 | v0.4.0 → v1.0.0 | 971 → 871 ns (**−10%**)    | 1,043 → 945 ns (**−9%**)   | 825 → 813 ns          |
 | v1.0.0 → v1.1.0 | 883 → 877 ns (same)        | 951 → 953 ns (same)        | 816 → 860 ns          |
 | v1.2.0 → v1.3.0 | 881 → 868 ns (same)        | 964 → 943 ns (same)        | 809 → 807 ns          |
+| v1.3.0 → v1.4.0 | 863 → 805 ns (**−7%**)     | 934 → 879 ns (**−6%**)     | 805 → 800 ns          |
 
-Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use. v1.1 and v1.2 leave the parse path of release builds unchanged (they add to help output only); v1.3 adds one pass over the options for environment variables, within the noise. The CI timings above are from v1.0.
+Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use. v1.1 and v1.2 leave the parse path of release builds unchanged (they add to help output only); v1.3 adds one pass over the options for environment variables, within the noise. v1.4 parses integers with its own digit loop instead of `strtol`, which closes the gap to `getopt_long` on MinGW. The CI timings above are from v1.0.
 
 ### Debug builds
 
@@ -65,19 +66,19 @@ v0.1 copied every value to the heap and looked options up by name twice: once wh
 
 ## Code size
 
-The `.text` added to a minimal 3-option program, compared with the same program without a parser. Release builds: `-Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections`, v1.3:
+The `.text` added to a minimal 3-option program, compared with the same program without a parser. Release builds: `-Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections`, v1.4:
 
 | Platform                     | argh    | argh reduced | getopt_long |
 | ---------------------------- | ------: | -----------: | ----------: |
-| Linux, GCC 13.3 (CI)         | 18.3 KB |      15.3 KB |      0.6 KB |
-| Linux, Clang 18.1 (CI)       | 22.6 KB |      17.8 KB |      0.5 KB |
+| Linux, GCC 13.3 (CI)         | 18.6 KB |      15.6 KB |      0.6 KB |
+| Linux, Clang 18.1 (CI)       | 23.0 KB |      18.3 KB |      0.5 KB |
 | Linux ARM64, GCC 13.3 (CI)   | 18.9 KB |              |      0.6 KB |
 | Linux ARM64, Clang 18.1 (CI) | 20.8 KB |              |      0.5 KB |
 | Windows, MinGW GCC 15.2 (CI) | 18.6 KB |              |     28.0 KB |
 
 "Reduced" is `-DARGH_NO_COMMANDS -DARGH_NO_SUGGEST`, for programs that don't need commands or "did you mean" suggestions. What each option saves on Linux GCC: `ARGH_NO_COMMANDS` 2.3 KB, `ARGH_NO_SUGGEST` 0.8 KB, `ARGH_NO_FLOAT` 0.4 KB (far more on firmware, see below), `ARGH_HELP_WIDTH=0` 0.2 KB. Debug builds are about 2.5 KB larger: they also check your definitions and examples.
 
-Linux GCC at each release, as measured then: v0.1 7.3 KB, v0.2 12.1 KB, v0.3 17.1 KB, v0.4 17.6 KB, v1.0 17.7 KB, all without `NDEBUG`. From v1.1, release builds: v1.0 16.7 KB, v1.1 16.9 KB (the help section for examples), v1.2 17.3 KB (wrapping long help), v1.3 18.3 KB (environment variables).
+Linux GCC at each release, as measured then: v0.1 7.3 KB, v0.2 12.1 KB, v0.3 17.1 KB, v0.4 17.6 KB, v1.0 17.7 KB, all without `NDEBUG`. From v1.1, release builds: v1.0 16.7 KB, v1.1 16.9 KB (the help section for examples), v1.2 17.3 KB (wrapping long help), v1.3 18.3 KB (environment variables), v1.4 18.6 KB (unsigned types, own integer parsing).
 
 Read this one with care:
 
@@ -92,11 +93,11 @@ Flash added to a bare-metal firmware shell command with three options, compared 
 
 | Build                                                                 | Cortex-M0 | Cortex-M4 |  Budget |
 | --------------------------------------------------------------------- | --------: | --------: | ------: |
-| `ARGH_NO_FLOAT`                                                       |   11.4 KB |   11.7 KB | 12.0 KB |
-| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST`, `ARGH_HELP_WIDTH=0` |    9.5 KB |    9.8 KB | 10.0 KB |
-| with `argh_double` (`ARGH_NO_STDIO` only)                             |   38.4 KB |   32.1 KB |       - |
+| `ARGH_NO_FLOAT`                                                       |   11.1 KB |   11.4 KB | 12.0 KB |
+| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST`, `ARGH_HELP_WIDTH=0` |    9.2 KB |    9.5 KB | 10.0 KB |
+| with `argh_double` (`ARGH_NO_STDIO` only)                             |   38.3 KB |   31.9 KB |       - |
 
-- **Numbers include everything linked because of argh**: help and error strings, and the C library functions it calls (`strtol`, `strcmp` and others).
+- **Numbers include everything linked because of argh**: help and error strings, and the C library functions it calls (`strcmp`, `memcpy` and others).
 - **Why doubles cost 27 KB:** newlib's `strtod` brings its float parser and soft-float arithmetic, and through an internal `assert` also `fprintf`. `ARGH_NO_FLOAT` removes `argh_double` so none of it is linked.
 - **RAM:** `sizeof(argh_parser)` is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes with the default of 32. With tables only, set `ARGH_BUILDER_CAP` to 0 and it is 164 bytes.
 - Run it yourself: `make size-arm` ([bench/size_arm.sh](bench/size_arm.sh), [bench/size_fw.c](bench/size_fw.c)).
