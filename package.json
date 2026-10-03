@@ -1,6 +1,6 @@
 {
   "name": "aargh",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "repo": "ilyabrin/aargh",
   "description": "Single-header command-line argument parser for C99",
   "keywords": ["cli", "argument-parser", "command-line", "header-only", "embedded"],

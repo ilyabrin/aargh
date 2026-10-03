@@ -65,8 +65,8 @@ argh is 15% to 24% faster than `getopt_long`, 10% to 13% faster than cargs, and 
 
 | Parser                                    | GCC 13.3 | Clang 18.1 |
 | ----------------------------------------- | -------: | ---------: |
-| argh                                      |  19.1 KB |    24.0 KB |
-| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`) |  16.0 KB |    19.0 KB |
+| argh                                      |  19.7 KB |    24.7 KB |
+| argh (`ARGH_NO_COMMANDS ARGH_NO_SUGGEST`) |  16.6 KB |    19.7 KB |
 | cargs                                     |   2.9 KB |     2.9 KB |
 | argparse                                  |   4.2 KB |     3.9 KB |
 | getopt_long                               |   0.6 KB |     0.5 KB |
@@ -75,8 +75,8 @@ On a Cortex-M0 (newlib-nano, the same program printing with `printf`):
 
 | Parser                    | Flash added |
 | ------------------------- | ----------: |
-| argh                      |     33.1 KB |
-| argh with `ARGH_NO_FLOAT` |     11.3 KB |
+| argh                      |     33.5 KB |
+| argh with `ARGH_NO_FLOAT` |     11.8 KB |
 | cargs                     |      1.7 KB |
 | argparse                  |     22.6 KB |
 

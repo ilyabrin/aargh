@@ -2,9 +2,9 @@
 # only carries its include path and the C99 requirement. As before, define
 # ARGH_IMPLEMENTATION in one source file of your program.
 #
-#   FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.9.0)
+#   FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.10.0)
 #   FetchContent_MakeAvailable(aargh)         # or add_subdirectory(aargh)
-#   find_package(aargh 1.9 REQUIRED)          # after cmake --install
+#   find_package(aargh 1.10 REQUIRED)          # after cmake --install
 #   target_link_libraries(app PRIVATE aargh::aargh)
 #
 # The header installs to include/aargh/argh.h, with include/aargh on the

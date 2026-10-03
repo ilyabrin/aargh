@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-10-04
+
 ### Added
 
 - Shell completion: `argh_completions(&p)` adds `--completions <shell>`, which prints a completion script for bash, zsh or fish and exits like `--help`. It completes options (and `--no-` forms), commands at every level, enum choices, and file names for strings and positionals; fish shows each option's help. `argh_print_completion(&p, shell)` prints a script for your own command or install step. Scripts are generated from the tables, so Tab never runs the program.
@@ -232,7 +234,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/ilyabrin/aargh/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ilyabrin/aargh/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ilyabrin/aargh/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/ilyabrin/aargh/compare/v1.6.0...v1.7.0

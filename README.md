@@ -42,7 +42,7 @@ The library is one header, `argh.h`; its packages are called **aargh**. Pick the
 | Anything | copy [argh.h](argh.h) into your project |
 | CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `aargh::aargh` |
 | Meson | the repository in `subprojects/aargh`, then `dependency('aargh')` |
-| Conan 2 | `conan create .` in this repository, then require `aargh/1.9.0` |
+| Conan 2 | `conan create .` in this repository, then require `aargh/1.10.0` |
 | clib | `clib install ilyabrin/aargh` |
 | Make and others | `cc $(pkg-config --cflags aargh) ...` after installing |
 
@@ -50,13 +50,13 @@ The library is one header, `argh.h`; its packages are called **aargh**. Pick the
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.9.0)
+FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.10.0)
 FetchContent_MakeAvailable(aargh)
 
 target_link_libraries(app PRIVATE aargh::aargh)
 ```
 
-With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.9 REQUIRED)`: it accepts any later 1.x, never 2.0.
+With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.10 REQUIRED)`: it accepts any later 1.x, never 2.0.
 
 **Install** the header, the CMake package and `aargh.pc` (for pkg-config):
 
@@ -886,7 +886,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.9.0" */
+ARGH_VERSION          /* "1.10.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -1000,7 +1000,7 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.8 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.9 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks
