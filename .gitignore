@@ -66,3 +66,7 @@ timeout-*
 /examples/wc
 /examples/logship
 /examples/pkg/pkg
+
+# Conan test_package output
+test_package/build/
+CMakeUserPresets.json

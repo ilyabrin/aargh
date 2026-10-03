@@ -33,6 +33,8 @@ argh is one header, so any of these works. Pick the one your build already uses:
 | Anything | copy [argh.h](argh.h) into your project |
 | CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `argh::argh` |
 | Meson | the repository in `subprojects/argh`, then `dependency('argh')` |
+| Conan 2 | `conan create .` in this repository, then require `argh/1.8.0` |
+| clib | `clib install ilyabrin/argh` |
 | Make and others | `cc $(pkg-config --cflags argh) ...` after installing |
 
 **CMake**, fetched at configure time (nothing to install):
@@ -970,7 +972,7 @@ make fuzz       # fuzz the parser with libFuzzer (needs clang), 60 s by default
 make size-arm   # flash added to ARM firmware, checked against budgets
 make docs-check # README examples and llms.txt match the code (Python 3)
 make coverage   # lines of argh.h the tests run, at least 98% (gcc, gcov)
-make package-check # CMake, pkg-config and Meson builds of a program that uses argh
+make package-check # CMake, pkg-config, Conan and Meson builds of a program that uses argh
 ```
 
 With CMake instead of make, on any platform: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.

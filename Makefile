@@ -100,7 +100,7 @@ docs-check:
 coverage:
 	sh tests/coverage.sh
 
-# argh as a package: CMake, pkg-config and Meson (skips tools you lack)
+# argh as a package: CMake, pkg-config, Conan and Meson (skips tools you lack)
 package-check:
 	sh tests/package/check.sh
 

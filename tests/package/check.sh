@@ -1,7 +1,8 @@
 #!/bin/sh
 # Builds tests/package/app.c against argh in every supported way and runs it:
-# CMake (install + find_package, FetchContent, add_subdirectory), pkg-config
-# and a Meson subproject. Ways whose tool is missing are skipped, unless
+# CMake (install + find_package, FetchContent, add_subdirectory), pkg-config,
+# Conan (conan create) and a Meson subproject; checks package.json for clib.
+# Ways whose tool is missing are skipped, unless
 # ARGH_PACKAGE_STRICT=1 (CI), where a missing tool is a failure.
 # Usage: sh tests/package/check.sh
 set -e
@@ -72,6 +73,22 @@ elif pkg-config --version >/dev/null 2>&1 && [ -f "$OUT/prefix/share/pkgconfig/a
     if ${CC:-cc} -std=c99 $flags -o "$OUT/pc-app" "$HERE/app.c"; then run "pkg-config" "$(exe "$OUT/pc-app")"; else bad "pkg-config build"; fi
 else
     skip "pkg-config" pkg-config
+fi
+
+# clib reads package.json from the repository; its version must follow argh.h
+if grep -q "\"version\": \"$VERSION\"" "$ROOT/package.json"; then ok "package.json version"; else bad "package.json version is not $VERSION"; fi
+
+CONAN=${CONAN:-conan}
+if command -v "$CONAN" >/dev/null 2>&1; then
+    # Builds the package from this checkout and runs test_package against it
+    if (cd "$ROOT" && "$CONAN" create . --build=missing) >"$OUT/log" 2>&1 && grep -q "$EXPECT" "$OUT/log"; then
+        ok "conan create"
+    else
+        cat "$OUT/log"
+        bad "conan create"
+    fi
+else
+    skip "conan create" conan
 fi
 
 MESON=${MESON:-meson}
