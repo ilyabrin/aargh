@@ -144,6 +144,10 @@ Add usage examples with `argh_example(&p, "tool -j 8 data.csv", "What it does")`
 
 `argh_range(&p, &jobs, 1, 64)` or `ARGH_RANGE(&jobs, 1, 64)` directly after an `int`, `long`, `unsigned` or `size_t` option: values outside 1..64 (inclusive) fail with `value '0' for '-j' is out of range (1 to 64)`. Applies to command-line, environment and implicit values, not to the variable's initial value. Help shows `<1..64>` unless a metavar is set. May be combined with `ARGH_IMPLICIT` in either order.
 
+## Install
+
+One header. CMake: `FetchContent_Declare(argh GIT_REPOSITORY https://github.com/ilyabrin/argh GIT_TAG v1.8.0)` + `FetchContent_MakeAvailable(argh)`, or `add_subdirectory`, or `find_package(argh 1.8 REQUIRED)` after `cmake --install`; then `target_link_libraries(app PRIVATE argh::argh)`. Meson: `dependency('argh', fallback: ['argh', 'argh_dep'])`. pkg-config: `pkg-config --cflags argh`. Conan 2: `conan create .` in the repository, then `argh/<version>` with target `argh::argh`. clib: `clib install ilyabrin/argh`. In every case one source file defines `ARGH_IMPLEMENTATION` before including argh.h.
+
 ## Environment variables
 
 `argh_env(&p, &jobs, "TOOL_JOBS")` or `ARGH_ENV(&jobs, "TOOL_JOBS")` in a table: when the command line doesn't set the option, its value comes from that variable, checked like a command-line value. Order: command line, environment, default. A value from the environment satisfies a required option and counts for `argh_given` and rules. Help shows `[env: TOOL_JOBS]`; errors say `in TOOL_JOBS`. `ARGH_GETENV(name)` (default `getenv`) can be redefined, for example to fake the environment in tests; with `ARGH_NO_STDIO` there is no environment unless it is defined.

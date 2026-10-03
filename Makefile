@@ -34,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm docs-check coverage fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check coverage package-check fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -99,6 +99,10 @@ docs-check:
 # Line coverage of argh.h by the unit tests (gcc and gcov); fails below 98%
 coverage:
 	sh tests/coverage.sh
+
+# argh as a package: CMake, pkg-config, Conan and Meson (skips tools you lack)
+package-check:
+	sh tests/package/check.sh
 
 size-arm:
 	sh bench/size_arm.sh

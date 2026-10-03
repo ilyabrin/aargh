@@ -24,6 +24,47 @@ argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 - **Fuzzed and sanitized.** Every pull request runs the tests with ASan and UBSan and fuzzes the parser.
 - **On par with `getopt_long` in speed**, while validating every value. See [Benchmarks](#benchmarks).
 
+## Install
+
+argh is one header, so any of these works. Pick the one your build already uses:
+
+| Build | Add argh with |
+| ----- | ------------- |
+| Anything | copy [argh.h](argh.h) into your project |
+| CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `argh::argh` |
+| Meson | the repository in `subprojects/argh`, then `dependency('argh')` |
+| Conan 2 | `conan create .` in this repository, then require `argh/1.8.0` |
+| clib | `clib install ilyabrin/argh` |
+| Make and others | `cc $(pkg-config --cflags argh) ...` after installing |
+
+**CMake**, fetched at configure time (nothing to install):
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(argh GIT_REPOSITORY https://github.com/ilyabrin/argh GIT_TAG v1.8.0)
+FetchContent_MakeAvailable(argh)
+
+target_link_libraries(app PRIVATE argh::argh)
+```
+
+With a copy or a git submodule in `third_party/argh`, use `add_subdirectory(third_party/argh)` instead of the first three lines. After installing argh, `find_package(argh 1.8 REQUIRED)`: it accepts any later 1.x, never 2.0.
+
+**Install** the header, the CMake package and `argh.pc` (for pkg-config):
+
+```sh
+cmake -S . -B build
+cmake --install build --prefix /usr/local
+```
+
+**Meson**: put the repository in `subprojects/argh`, then
+
+```meson
+argh_dep = dependency('argh', fallback: ['argh', 'argh_dep'])
+executable('app', 'app.c', dependencies: argh_dep)
+```
+
+Whichever way you choose, define `ARGH_IMPLEMENTATION` in exactly one source file before including `argh.h`, as in the quick start below. As a dependency argh builds nothing and installs nothing; its tests run only when you build the repository itself (`ARGH_BUILD_TESTS`, `ARGH_INSTALL` to change that).
+
 ## Quick start
 
 Copy `argh.h` next to your code:
@@ -787,7 +828,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.7.0" */
+ARGH_VERSION          /* "1.8.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -931,9 +972,12 @@ make fuzz       # fuzz the parser with libFuzzer (needs clang), 60 s by default
 make size-arm   # flash added to ARM firmware, checked against budgets
 make docs-check # README examples and llms.txt match the code (Python 3)
 make coverage   # lines of argh.h the tests run, at least 98% (gcc, gcov)
+make package-check # CMake, pkg-config, Conan and Meson builds of a program that uses argh
 ```
 
-CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, the coverage minimum and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
+With CMake instead of make, on any platform: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
+
+CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, the coverage minimum, every way of installing argh, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
 
 ## Contributing
 

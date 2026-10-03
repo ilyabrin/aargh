@@ -195,12 +195,15 @@ def check_names():
     for n in sorted(names):
         if not re.search(r'\b' + n + r'\b', readme):
             fail('README.md does not mention %s from argh.h' % n)
+    # Names from the build files (CMake options, the Meson dependency) are
+    # checked against those files instead
+    build = read('CMakeLists.txt') + read('meson.build')
     for n in sorted(set(re.findall(ident, current))):
         # Names ending in _ are patterns such as ARGH_E_* or ARGH__K_*
         if n.endswith('_') or n.startswith('argh_init_settings_'):
             continue
-        if not re.search(r'\b' + n + r'\b', header):
-            fail('README.md mentions %s, which argh.h does not have' % n)
+        if not re.search(r'\b' + n + r'\b', header) and not re.search(r'\b' + n + r'\b', build):
+            fail('README.md mentions %s, which neither argh.h nor the build files have' % n)
     return len(names)
 
 
