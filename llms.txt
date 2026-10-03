@@ -146,7 +146,7 @@ Add usage examples with `argh_example(&p, "tool -j 8 data.csv", "What it does")`
 
 ## Install
 
-One header. CMake: `FetchContent_Declare(argh GIT_REPOSITORY https://github.com/ilyabrin/argh GIT_TAG v1.8.0)` + `FetchContent_MakeAvailable(argh)`, or `add_subdirectory`, or `find_package(argh 1.8 REQUIRED)` after `cmake --install`; then `target_link_libraries(app PRIVATE argh::argh)`. Meson: `dependency('argh', fallback: ['argh', 'argh_dep'])`. pkg-config: `pkg-config --cflags argh`. Conan 2: `conan create .` in the repository, then `argh/<version>` with target `argh::argh`. clib: `clib install ilyabrin/argh`. In every case one source file defines `ARGH_IMPLEMENTATION` before including argh.h.
+One header, `argh.h`; the packages are called aargh. CMake: `FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.9.0)` + `FetchContent_MakeAvailable(aargh)`, or `add_subdirectory`, or `find_package(aargh 1.9 REQUIRED)` after `cmake --install`; then `target_link_libraries(app PRIVATE aargh::aargh)`. The header installs to `include/aargh/argh.h` with `include/aargh` on the include path, so code keeps `#include "argh.h"`. Meson: `dependency('aargh', fallback: ['aargh', 'aargh_dep'])`. pkg-config: `pkg-config --cflags aargh`. Conan 2: `conan create .` in the repository, then `aargh/<version>` with target `aargh::aargh`. clib: `clib install ilyabrin/aargh`. The v1.8 names (`find_package(argh)`, `argh::argh`) work until 2.0. In every case one source file defines `ARGH_IMPLEMENTATION` before including argh.h.
 
 ## Environment variables
 
@@ -202,8 +202,8 @@ argh_custom(&p, 'p', "port", &port, &port_type, "Port to listen on");
 
 ## Docs
 
-- [README](https://github.com/ilyabrin/argh/blob/main/README.md): full guide and API reference
-- [argh.h](https://raw.githubusercontent.com/ilyabrin/argh/main/argh.h): the library; the header part documents every function
-- [Examples](https://github.com/ilyabrin/argh/tree/main/examples): wc (basics), logship (tables, custom types, rules), pkg (commands over several files)
-- [BENCHMARKS.md](https://github.com/ilyabrin/argh/blob/main/BENCHMARKS.md): speed, memory and code size
-- [CHANGELOG.md](https://github.com/ilyabrin/argh/blob/main/CHANGELOG.md): changes between versions
+- [README](https://github.com/ilyabrin/aargh/blob/main/README.md): full guide and API reference
+- [argh.h](https://raw.githubusercontent.com/ilyabrin/aargh/main/argh.h): the library; the header part documents every function
+- [Examples](https://github.com/ilyabrin/aargh/tree/main/examples): wc (basics), logship (tables, custom types, rules), pkg (commands over several files)
+- [BENCHMARKS.md](https://github.com/ilyabrin/aargh/blob/main/BENCHMARKS.md): speed, memory and code size
+- [CHANGELOG.md](https://github.com/ilyabrin/aargh/blob/main/CHANGELOG.md): changes between versions

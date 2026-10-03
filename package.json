@@ -1,7 +1,7 @@
 {
-  "name": "argh",
+  "name": "aargh",
   "version": "1.8.0",
-  "repo": "ilyabrin/argh",
+  "repo": "ilyabrin/aargh",
   "description": "Single-header command-line argument parser for C99",
   "keywords": ["cli", "argument-parser", "command-line", "header-only", "embedded"],
   "license": "MIT",

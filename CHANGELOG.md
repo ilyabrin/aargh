@@ -6,12 +6,25 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- The project is now **aargh**, after the snail's cry when salt hits it; the repository moved to github.com/ilyabrin/aargh (old links redirect). The name `argh` belongs to another library, a C++ parser, in vcpkg, ConanCenter and xmake-repo. The header stays `argh.h` and the API stays `argh_*` / `ARGH_*`: no code changes.
+- Packages use the new name: `find_package(aargh)` with `aargh::aargh`, `pkg-config aargh`, Meson `dependency('aargh')`, Conan `aargh/<version>`, clib `ilyabrin/aargh`. The header installs to `include/aargh/argh.h`, and each package puts `include/aargh` on the include path, so `#include "argh.h"` keeps working and can't collide with another `argh.h`.
+
+### Deprecated
+
+- The v1.8 package names `find_package(argh)`, `argh::argh` and Meson's `dependency('argh')`. They keep working until 2.0; `-DARGH_INSTALL_LEGACY_NAME=OFF` installs without them.
+
+### Added
+
+- A logo: the snail with salt, antennae drawn as `--`. In `assets/`, with light and dark versions for the README and a social preview image.
+
 ## [1.8.0] - 2026-10-03
 
 ### Added
 
 - Install with your build system: a CMake package (`argh::argh` through `FetchContent`, `add_subdirectory` or `find_package` after `cmake --install`, version-checked as SemVer), `argh.pc` for pkg-config, and a `meson.build` for Meson subprojects. The version comes from argh.h. As a dependency argh builds and installs nothing; built on its own, CMake runs the tests with `ctest`.
-- Conan 2: `conan create .` packages argh from the repository (header-only, `argh::argh` for CMakeDeps, `argh` for pkg-config), with a test_package. clib: `clib install ilyabrin/argh`.
+- Conan 2: `conan create .` packages argh from the repository (header-only, `argh::argh` for CMakeDeps, `argh` for pkg-config), with a test_package. clib: `clib install ilyabrin/aargh`.
 - CI builds and runs a program through each of these on Linux and Windows (`make package-check`).
 
 ## [1.7.0] - 2026-10-03
@@ -211,18 +224,18 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.8.0...HEAD
-[1.8.0]: https://github.com/ilyabrin/argh/compare/v1.7.0...v1.8.0
-[1.7.0]: https://github.com/ilyabrin/argh/compare/v1.6.0...v1.7.0
-[1.6.0]: https://github.com/ilyabrin/argh/compare/v1.5.0...v1.6.0
-[1.5.0]: https://github.com/ilyabrin/argh/compare/v1.4.0...v1.5.0
-[1.4.0]: https://github.com/ilyabrin/argh/compare/v1.3.0...v1.4.0
-[1.3.0]: https://github.com/ilyabrin/argh/compare/v1.2.0...v1.3.0
-[1.2.0]: https://github.com/ilyabrin/argh/compare/v1.1.0...v1.2.0
-[1.1.0]: https://github.com/ilyabrin/argh/compare/v1.0.0...v1.1.0
-[1.0.0]: https://github.com/ilyabrin/argh/compare/v0.4.0...v1.0.0
-[0.4.0]: https://github.com/ilyabrin/argh/compare/v0.3.1...v0.4.0
-[0.3.1]: https://github.com/ilyabrin/argh/compare/v0.3.0...v0.3.1
-[0.3.0]: https://github.com/ilyabrin/argh/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/ilyabrin/argh/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/ilyabrin/argh/releases/tag/v0.1.0
+[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/ilyabrin/aargh/compare/v1.7.0...v1.8.0
+[1.7.0]: https://github.com/ilyabrin/aargh/compare/v1.6.0...v1.7.0
+[1.6.0]: https://github.com/ilyabrin/aargh/compare/v1.5.0...v1.6.0
+[1.5.0]: https://github.com/ilyabrin/aargh/compare/v1.4.0...v1.5.0
+[1.4.0]: https://github.com/ilyabrin/aargh/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/ilyabrin/aargh/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/ilyabrin/aargh/compare/v1.1.0...v1.2.0
+[1.1.0]: https://github.com/ilyabrin/aargh/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/ilyabrin/aargh/compare/v0.4.0...v1.0.0
+[0.4.0]: https://github.com/ilyabrin/aargh/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/ilyabrin/aargh/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/ilyabrin/aargh/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/ilyabrin/aargh/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/ilyabrin/aargh/releases/tag/v0.1.0
