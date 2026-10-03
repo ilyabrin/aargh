@@ -906,14 +906,16 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Benchmarks
 
-Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.0 on CI. Each row comes from one machine; compare within a row:
+Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.6 on CI. Each row comes from one machine; compare within a row:
 
 | Platform           | argh (table) | argh (builder) | getopt_long |
 | ------------------ | -----------: | -------------: | ----------: |
-| macOS, Clang       |       508 ns |         557 ns |      635 ns |
-| Linux, Clang       |       551 ns |         628 ns |      628 ns |
-| Linux, GCC         |       605 ns |         706 ns |      622 ns |
-| Windows, MinGW GCC |       953 ns |       1,009 ns |      894 ns |
+| macOS, Clang       |       397 ns |         434 ns |      474 ns |
+| Linux, Clang       |       543 ns |         611 ns |      631 ns |
+| Linux, GCC         |       535 ns |         657 ns |      565 ns |
+| Linux ARM64, Clang |       469 ns |         539 ns |      453 ns |
+| Linux ARM64, GCC   |       495 ns |         587 ns |      437 ns |
+| Windows, MinGW GCC |       907 ns |         984 ns |      887 ns |
 
 argh makes zero heap allocations. Details, memory, code size and the method: [BENCHMARKS.md](BENCHMARKS.md). Run them with `make bench`.
 
