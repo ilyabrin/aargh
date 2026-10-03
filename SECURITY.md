@@ -14,7 +14,7 @@ Only the latest release receives fixes.
 Please **do not open a public issue** for security problems.
 
 Report privately through GitHub instead:
-[Report a vulnerability](https://github.com/ilyabrin/argh/security/advisories/new)
+[Report a vulnerability](https://github.com/ilyabrin/aargh/security/advisories/new)
 
 Helpful things to include:
 

@@ -2,8 +2,8 @@
 prefix=${pcfiledir}/../..
 includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
 
-Name: argh
-Description: @PROJECT_DESCRIPTION@
+Name: aargh
+Description: @PROJECT_DESCRIPTION@ (argh.h)
 URL: @PROJECT_HOMEPAGE_URL@
 Version: @PROJECT_VERSION@
-Cflags: -I${includedir}
+Cflags: -I${includedir}/aargh

@@ -1,6 +1,13 @@
-# argh.h
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo-light.svg" alt="aargh" width="332" height="120">
+  </picture>
+</p>
 
-[![CI](https://github.com/ilyabrin/argh/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyabrin/argh/actions/workflows/ci.yml)
+# aargh: argh.h
+
+[![CI](https://github.com/ilyabrin/aargh/actions/workflows/ci.yml/badge.svg)](https://github.com/ilyabrin/aargh/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A single-header command-line argument parser for C. Your options write straight into your variables.
@@ -24,46 +31,52 @@ argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
 - **Fuzzed and sanitized.** Every pull request runs the tests with ASan and UBSan and fuzzes the parser.
 - **On par with `getopt_long` in speed**, while validating every value. See [Benchmarks](#benchmarks).
 
+*The name:* "Aargh!" is what the snail in the comic says when salt hits it, and what parsing `argv` by hand in C feels like.
+
 ## Install
 
-argh is one header, so any of these works. Pick the one your build already uses:
+The library is one header, `argh.h`; its packages are called **aargh**. Pick the way your build already uses:
 
-| Build | Add argh with |
-| ----- | ------------- |
+| Build | Add aargh with |
+| ----- | -------------- |
 | Anything | copy [argh.h](argh.h) into your project |
-| CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `argh::argh` |
-| Meson | the repository in `subprojects/argh`, then `dependency('argh')` |
-| Conan 2 | `conan create .` in this repository, then require `argh/1.8.0` |
-| clib | `clib install ilyabrin/argh` |
-| Make and others | `cc $(pkg-config --cflags argh) ...` after installing |
+| CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `aargh::aargh` |
+| Meson | the repository in `subprojects/aargh`, then `dependency('aargh')` |
+| Conan 2 | `conan create .` in this repository, then require `aargh/1.9.0` |
+| clib | `clib install ilyabrin/aargh` |
+| Make and others | `cc $(pkg-config --cflags aargh) ...` after installing |
 
 **CMake**, fetched at configure time (nothing to install):
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(argh GIT_REPOSITORY https://github.com/ilyabrin/argh GIT_TAG v1.8.0)
-FetchContent_MakeAvailable(argh)
+FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.9.0)
+FetchContent_MakeAvailable(aargh)
 
-target_link_libraries(app PRIVATE argh::argh)
+target_link_libraries(app PRIVATE aargh::aargh)
 ```
 
-With a copy or a git submodule in `third_party/argh`, use `add_subdirectory(third_party/argh)` instead of the first three lines. After installing argh, `find_package(argh 1.8 REQUIRED)`: it accepts any later 1.x, never 2.0.
+With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.9 REQUIRED)`: it accepts any later 1.x, never 2.0.
 
-**Install** the header, the CMake package and `argh.pc` (for pkg-config):
+**Install** the header, the CMake package and `aargh.pc` (for pkg-config):
 
 ```sh
 cmake -S . -B build
 cmake --install build --prefix /usr/local
 ```
 
-**Meson**: put the repository in `subprojects/argh`, then
+The header goes to `include/aargh/argh.h`, and the package puts `include/aargh` on your include path, so your code keeps `#include "argh.h"` and can't pick up another library's `argh.h`.
+
+**Meson**: put the repository in `subprojects/aargh`, then
 
 ```meson
-argh_dep = dependency('argh', fallback: ['argh', 'argh_dep'])
-executable('app', 'app.c', dependencies: argh_dep)
+aargh_dep = dependency('aargh', fallback: ['aargh', 'aargh_dep'])
+executable('app', 'app.c', dependencies: aargh_dep)
 ```
 
-Whichever way you choose, define `ARGH_IMPLEMENTATION` in exactly one source file before including `argh.h`, as in the quick start below. As a dependency argh builds nothing and installs nothing; its tests run only when you build the repository itself (`ARGH_BUILD_TESTS`, `ARGH_INSTALL` to change that).
+Whichever way you choose, define `ARGH_IMPLEMENTATION` in exactly one source file before including `argh.h`, as in the quick start below. As a dependency aargh builds nothing and installs nothing; its tests run only when you build the repository itself (`ARGH_BUILD_TESTS`, `ARGH_INSTALL` to change that).
+
+The v1.8 names `find_package(argh)`, `argh::argh` and Meson's `dependency('argh')` still work until 2.0; `ARGH_INSTALL_LEGACY_NAME=OFF` installs without them.
 
 ## Quick start
 
@@ -828,7 +841,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.8.0" */
+ARGH_VERSION          /* "1.9.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.

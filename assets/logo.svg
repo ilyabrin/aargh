@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="aargh">
+<title>aargh</title>
+<rect width="120" height="120" rx="26" fill="#1f2a22"/>
+<path d="M14 88 L96 88 C104 88 106 80 104 74 L100 60 C98 54 92 54 90 60 L88 70 C86 76 82 78 76 78 L22 78 C14 78 10 88 14 88 Z" fill="#86a889"/>
+<circle cx="48" cy="58" r="26" fill="#c8722a"/>
+<path d="M48 58 a4 4 0 0 1 8 0 a8 8 0 0 1 -16 0 a12 12 0 0 1 24 0 a16 16 0 0 1 -32 0 a20 20 0 0 1 40 0" fill="none" stroke="#5e2f08" stroke-width="3.6" stroke-linecap="round"/>
+<path d="M86 38 H100 M86 48 H100" stroke="#eef1ea" stroke-width="5" stroke-linecap="round"/>
+<rect x="40" y="18" width="7" height="7" rx="1" fill="#ffffff" transform="rotate(18 43.5 21.5)"/>
+<rect x="56" y="12" width="7" height="7" rx="1" fill="#ffffff" transform="rotate(-12 59.5 15.5)"/>
+</svg>
