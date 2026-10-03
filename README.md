@@ -246,6 +246,39 @@ color=auto files=0
 - The option needs a long name, so that a value can still be given. Without `NDEBUG` argh checks this, that the entry comes right after its option, and that the option accepts the value.
 - `--color` alone counts as given for `argh_given`, required options and rules. A value from the environment is an ordinary value.
 
+### Ranges
+
+Limit an integer option to the values your program can use. Put `argh_range` right after the option; both bounds are included:
+
+<!-- docs-check: source=tests/docs/rangetool.c -->
+```c
+argh_int(&p, 'j', "jobs", &jobs, "Parallel jobs");
+argh_range(&p, &jobs, 1, 64);      /* or in a table, right after the option: ARGH_RANGE(&jobs, 1, 64) */
+argh_uint(&p, 'l', "level", &level, "Compression level");
+argh_range(&p, &level, 1, 9);
+```
+
+<!-- docs-check: program=rangetool -->
+```console
+$ ./tool --help
+Usage: tool [OPTIONS]
+
+Options:
+  -j, --jobs <1..64>  Parallel jobs (default: 4)
+  -l, --level <1..9>  Compression level (default: 3)
+
+  -h, --help          Print help
+
+$ ./tool -j 0
+tool: value '0' for '-j' is out of range (1 to 64)
+Try 'tool --help' for more information.
+```
+
+- Works with `int`, `long`, `unsigned` and `size_t` options. The bounds are `long`.
+- The range applies wherever the value comes from: the command line, the environment, an [optional value](#optional-values). The default you initialized the variable with is not checked, so `0` can still mean "automatic".
+- Help shows the range as the value name, unless you set one with `argh_metavar`.
+- With `ARGH_IMPLICIT`, the two entries can come in either order after the option. Without `NDEBUG` argh checks that the range follows an integer option and fits its type.
+
 ### Environment variables
 
 Let an option fall back to an environment variable, the way tools take settings in containers and CI:
@@ -613,7 +646,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.3 to 9.6 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.5 to 9.9 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -699,6 +732,7 @@ argh_opt *argh_group (argh_parser *p, const char *title);
 argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  /* checked without NDEBUG */
 argh_opt *argh_env    (argh_parser *p, void *target, const char *name);          /* fallback for target's option */
 argh_opt *argh_implicit(argh_parser *p, void *target, const char *value);      /* right after it: value optional */
+argh_opt *argh_range   (argh_parser *p, void *target, long lo, long hi);       /* right after it: lo..hi only */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -735,6 +769,7 @@ ARGH_GROUP(title)                            ARGH_END
 ARGH_EXAMPLE(command, help)                  /* a usage example, shown in help */
 ARGH_ENV(&var, name)                         /* environment variable for var's option */
 ARGH_IMPLICIT(&var, value)                   /* right after var's option: --name alone means --name=value */
+ARGH_RANGE(&var, lo, hi)                     /* right after var's integer option: lo..hi, both included */
 
 /* Commands, in a table ending with ARGH_CMD_END (commands) */
 ARGH_CMD(name, help, options[, handler[, flags]])   /* flags: ARGH_POSIX */
@@ -752,7 +787,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.5.0" */
+ARGH_VERSION          /* "1.6.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -866,19 +901,21 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.3 to 11.6 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.5 to 11.7 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks
 
-Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.0 on CI. Each row comes from one machine; compare within a row:
+Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.6 on CI. Each row comes from one machine; compare within a row:
 
 | Platform           | argh (table) | argh (builder) | getopt_long |
 | ------------------ | -----------: | -------------: | ----------: |
-| macOS, Clang       |       508 ns |         557 ns |      635 ns |
-| Linux, Clang       |       551 ns |         628 ns |      628 ns |
-| Linux, GCC         |       605 ns |         706 ns |      622 ns |
-| Windows, MinGW GCC |       953 ns |       1,009 ns |      894 ns |
+| macOS, Clang       |       397 ns |         434 ns |      474 ns |
+| Linux, Clang       |       543 ns |         611 ns |      631 ns |
+| Linux, GCC         |       535 ns |         657 ns |      565 ns |
+| Linux ARM64, Clang |       469 ns |         539 ns |      453 ns |
+| Linux ARM64, GCC   |       495 ns |         587 ns |      437 ns |
+| Windows, MinGW GCC |       907 ns |         984 ns |      887 ns |
 
 argh makes zero heap allocations. Details, memory, code size and the method: [BENCHMARKS.md](BENCHMARKS.md). Run them with `make bench`.
 

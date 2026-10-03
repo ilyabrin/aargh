@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-03
+
+### Added
+
+- Ranges: `argh_range(&p, &jobs, 1, 64)` or `ARGH_RANGE(&jobs, 1, 64)` right after an `int`, `long`, `unsigned` or `size_t` option. Values outside the bounds (both included) fail with `value '0' for '-j' is out of range (1 to 64)`, from the command line, the environment or an implicit value. Help shows `<1..64>` unless you set a value name. Without `NDEBUG` argh checks that the range follows an integer option and fits its type. Costs about 200 to 260 bytes on firmware and nothing measurable in parse time.
+
 ## [1.5.0] - 2026-10-03
 
 ### Added
@@ -190,7 +196,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/argh/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/ilyabrin/argh/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/ilyabrin/argh/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/ilyabrin/argh/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/ilyabrin/argh/compare/v1.2.0...v1.3.0
