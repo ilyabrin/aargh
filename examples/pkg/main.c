@@ -90,6 +90,7 @@ int main(int argc, char **argv)
     argh_init(&p, "pkg", "A package manager (dry run: prints what it would do)");
     argh_version(&p, "0.9.0");
     argh_table(&p, global_opts);
+    argh_completions(&p); /* pkg --completions bash|zsh|fish */
     argh_commands(&p, commands);
     argh_rules(&p, rules);
     argh_set_validator(&p, validate, NULL);

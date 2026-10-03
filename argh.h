@@ -38,6 +38,7 @@
  *   ARGH_HELP_WIDTH   column where help text wraps, 0 for none (80)
  *   ARGH_NO_SUGGEST   no "did you mean" suggestions in error messages
  *   ARGH_NO_COMMANDS  no commands: smaller code for programs without them
+ *   ARGH_NO_COMPLETION no shell completion scripts (argh_completions)
  *   ARGH_NO_STDIO     no <stdio.h>: output goes only to argh_set_writer()
  *   ARGH_NO_FLOAT     no argh_double: no strtod and no floating point
  *   ARGH_STATIC       all functions static, implementation included
@@ -137,7 +138,8 @@ extern "C"
         ARGH__K_ENUM,    /* int (index):   --mode fast */
         ARGH__K_LIST,    /* argh_values:   -I a -I b */
         ARGH__K_CUSTOM,  /* your type:     --size 10M, see argh_type */
-        /* Options end here: everything from FLAG to CUSTOM is one */
+        ARGH__K_COMPLETE, /* --completions <shell>, see argh_completions */
+        /* Options end here: everything from FLAG to COMPLETE is one */
         ARGH__K_POS,     /* const char *:  positional argument */
         ARGH__K_REST,    /* argh_values:   all remaining positionals */
         ARGH__K_GROUP,   /* help section heading */
@@ -458,6 +460,16 @@ extern "C"
 
     ARGH__DEF void argh_print_help(const argh_parser *p);
 
+    /* Shell completion. argh_completions adds --completions <shell> (bash,
+     * zsh or fish), which prints a completion script and stops, like --help.
+     * Call argh_print_completion yourself for a `completion` command or an
+     * install step; it returns false for another shell. Programs that call
+     * neither don't carry its code; ARGH_NO_COMPLETION also drops its strings
+     * (about 0.6 KB). With ARGH_NO_COMPLETION or ARGH_NO_STDIO (no shell),
+     * argh_completions adds nothing and returns NULL. */
+    ARGH__DEF argh_opt *argh_completions(argh_parser *p);
+    ARGH__DEF bool argh_print_completion(const argh_parser *p, const char *shell);
+
     /* ============================================================================
      * Table macros
      *
@@ -626,6 +638,7 @@ extern "C"
         ARGH__S_OK,
         ARGH__S_HELP,
         ARGH__S_VERSION,
+        ARGH__S_COMPLETION, /* --completions <shell> was given */
         ARGH__S_ERROR,
         ARGH__S_CHECKING /* parsing an example: check everything, write nothing */
     };
@@ -850,7 +863,31 @@ extern "C"
 
     static bool argh__is_option_kind(int kind)
     {
-        return kind >= ARGH__K_FLAG && kind <= ARGH__K_CUSTOM;
+        return kind >= ARGH__K_FLAG && kind <= ARGH__K_COMPLETE;
+    }
+
+#if !defined(ARGH_NO_STDIO) && !defined(ARGH_NO_COMPLETION)
+#define ARGH__COMPLETION
+#endif
+
+    /* What ARGH__K_COMPLETE entries point to. The generator is reached only
+     * through this, so the linker keeps it out of programs without it. */
+    typedef struct
+    {
+        const char *const *shells;
+        bool (*print)(const argh_parser *p, const char *shell);
+    } argh__completer;
+
+    static const char *const argh__shells[] = {"bash", "zsh", "fish", NULL};
+
+    /* The values an enum or --completions accepts */
+    static const char *const *argh__choices(const argh_opt *o)
+    {
+#ifdef ARGH__COMPLETION
+        if (o->kind == ARGH__K_COMPLETE)
+            return ((const argh__completer *)o->extra)->shells;
+#endif
+        return o->kind == ARGH__K_ENUM ? (const char *const *)o->extra : NULL;
     }
 
     /* For option kinds only: every one but flags and counters takes a value */
@@ -1104,14 +1141,15 @@ extern "C"
                 *(const char **)o->target = v;
             return ARGH_E_NONE;
         case ARGH__K_ENUM:
+        case ARGH__K_COMPLETE:
         {
-            const char *const *choices = (const char *const *)o->extra;
+            const char *const *choices = argh__choices(o);
             int i;
             for (i = 0; choices && choices[i]; i++)
             {
                 if (strcmp(choices[i], v) == 0)
                 {
-                    if (write)
+                    if (write && o->kind == ARGH__K_ENUM)
                         *(int *)o->target = i;
                     return ARGH_E_NONE;
                 }
@@ -1191,6 +1229,15 @@ extern "C"
             return argh__fail(p, e, argi, o, v, short_name);
         }
         argh__mark(p, index);
+#ifdef ARGH__COMPLETION
+        /* --completions <shell>: argh_parse prints the script, like help */
+        if (o->kind == ARGH__K_COMPLETE && ARGH__WRITING(p))
+        {
+            p->argh__error.opt = o;
+            p->argh__error.value = v;
+            return ARGH__S_COMPLETION;
+        }
+#endif
         return ARGH__S_OK;
     }
 
@@ -2409,6 +2456,13 @@ extern "C"
             argh__out(p, 0, p->argh__version);
             argh__out(p, 0, "\n");
             return false;
+#ifdef ARGH__COMPLETION
+        case ARGH__S_COMPLETION:
+            ((const argh__completer *)p->argh__error.opt->extra)->print(p, p->argh__error.value);
+            memset(&p->argh__error, 0, sizeof(p->argh__error));
+            p->argh__error.argv_index = -1;
+            return false;
+#endif
         default:
 #ifndef NDEBUG
             if (bad_example)
@@ -2574,8 +2628,9 @@ extern "C"
             argh__sb_put(b, "expected true or false");
             break;
         case ARGH__K_ENUM:
+        case ARGH__K_COMPLETE:
         {
-            const char *const *choices = (const char *const *)o->extra;
+            const char *const *choices = argh__choices(o);
             int i;
             argh__sb_put(b, "expected one of: ");
             for (i = 0; choices && choices[i]; i++)
@@ -2826,8 +2881,9 @@ extern "C"
             break;
         }
         case ARGH__K_ENUM:
+        case ARGH__K_COMPLETE:
         {
-            const char *const *choices = (const char *const *)o->extra;
+            const char *const *choices = argh__choices(o);
             int i;
             argh__sb_char(b, '<');
             for (i = 0; choices && choices[i]; i++)
@@ -3250,6 +3306,567 @@ extern "C"
             }
         }
     }
+
+#ifdef ARGH__COMPLETION
+    /* ------------------------------------------------------------------------
+     * Shell completion: static scripts built from the tables. Only
+     * argh_completions and argh_print_completion lead here, so programs that
+     * call neither don't carry this code.
+     * ------------------------------------------------------------------------ */
+
+    enum
+    {
+        ARGH__C_CMDS,  /* subcommand names at each command path */
+        ARGH__C_OPTS,  /* option words at each path */
+        ARGH__C_TAKES, /* option words whose value is the next argument */
+        ARGH__C_VALS,  /* what such a value can be: choices, or @file */
+        ARGH__C_FILES, /* paths that take positional arguments */
+        ARGH__C_FISH   /* fish: one complete line per option and command */
+    };
+
+    typedef struct
+    {
+        const argh_parser *p;
+        const char *name; /* the program */
+        char fn[48];      /* its name as a shell identifier */
+        bool fish;
+        bool positionals; /* the current path takes them */
+        bool any;         /* bash: the key matches every path (top-level options) */
+        bool own_v;       /* the path defines -V or --version itself */
+        bool own_version;
+#ifndef ARGH_NO_COMMANDS
+        const argh_cmd *path[ARGH_MAX_DEPTH];
+#endif
+        int depth;
+    } argh__comp;
+
+    static void argh__c_out(const argh__comp *c, const char *s)
+    {
+        argh__out(c->p, 0, s);
+    }
+
+    /* The command path as words: "" at the top, "remote add" below */
+    static void argh__c_path(const argh__comp *c)
+    {
+#ifndef ARGH_NO_COMMANDS
+        int d;
+        for (d = 0; d < c->depth; d++)
+        {
+            if (d)
+                argh__c_out(c, " ");
+            argh__c_out(c, c->path[d]->name);
+        }
+#else
+        (void)c;
+#endif
+    }
+
+    /* A single-quoted shell string; fish escapes ' and \ inside it */
+    static void argh__c_quoted(const argh__comp *c, const char *s)
+    {
+        argh__c_out(c, "'");
+        for (; s && *s; s++)
+        {
+            if (*s == '\'' || *s == '\\')
+                argh__c_out(c, "\\");
+            argh__outn(c->p, 0, s, 1);
+        }
+        argh__c_out(c, "'");
+    }
+
+    /* `"path|word"` for bash case labels, `'path|word'` for fish lists */
+    static void argh__c_key(const argh__comp *c, const char *dash, const char *word)
+    {
+        if (c->any)
+        {
+            argh__c_out(c, "*\"|");
+        }
+        else
+        {
+            argh__c_out(c, c->fish ? " '" : "\"");
+            argh__c_path(c);
+            argh__c_out(c, "|");
+        }
+        argh__c_out(c, dash);
+        argh__c_out(c, word);
+        argh__c_out(c, c->fish ? "'" : "\"");
+    }
+
+    static void argh__c_words(const argh__comp *c, const argh_opt *o, const char *sep)
+    {
+        char s[2];
+        s[0] = o->short_name;
+        s[1] = '\0';
+        if (o->short_name)
+            argh__c_key(c, "-", s);
+        if (o->short_name && o->long_name)
+            argh__c_out(c, sep);
+        if (o->long_name)
+            argh__c_key(c, "--", o->long_name);
+    }
+
+    /* Strings and lists are most often file names; custom types have their
+     * own syntax (sizes, versions), where file names would only be noise */
+    static bool argh__c_file(const argh_opt *o)
+    {
+        return o->kind == ARGH__K_STRING || o->kind == ARGH__K_LIST;
+    }
+
+    static void argh__c_fish_head(const argh__comp *c)
+    {
+        argh__c_out(c, "complete -c ");
+        argh__c_out(c, c->name);
+        argh__c_out(c, " -n \"__");
+        argh__c_out(c, c->fn);
+        argh__c_out(c, "_at '");
+        argh__c_path(c);
+        argh__c_out(c, "'\"");
+    }
+
+    static void argh__c_option(argh__comp *c, const argh_opt *o, int mode)
+    {
+        const char *const *choices = argh__choices(o);
+        /* An optional value (ARGH_IMPLICIT) is never the next argument */
+        bool value = argh__takes_value(o) && !argh__implicit(o);
+        char s[2];
+        int i;
+
+        if (o->kind == ARGH__K_POS || o->kind == ARGH__K_REST)
+            c->positionals = true;
+        if (!argh__is_option_kind(o->kind))
+            return;
+        /* A command may take over -V or --version, as in help */
+        if (o->short_name == 'V')
+            c->own_v = true;
+        if (o->long_name && strcmp(o->long_name, "version") == 0)
+            c->own_version = true;
+        if (o->flags & ARGH_HIDDEN)
+            return;
+        s[0] = o->short_name;
+        s[1] = '\0';
+        switch (mode)
+        {
+        case ARGH__C_OPTS:
+            if (o->short_name)
+            {
+                argh__c_out(c, " -");
+                argh__c_out(c, s);
+            }
+            if (o->long_name)
+            {
+                argh__c_out(c, " --");
+                argh__c_out(c, o->long_name);
+                if (o->kind == ARGH__K_FLAG && (o->flags & ARGH_NEGATABLE))
+                {
+                    argh__c_out(c, " --no-");
+                    argh__c_out(c, o->long_name);
+                }
+            }
+            break;
+        case ARGH__C_TAKES:
+            if (!value)
+                break;
+            if (c->fish)
+            {
+                argh__c_words(c, o, "");
+                break;
+            }
+            argh__c_out(c, "        ");
+            argh__c_words(c, o, "|");
+            argh__c_out(c, ") return 0 ;;\n");
+            break;
+        case ARGH__C_VALS:
+            if (!value || (!choices && !argh__c_file(o)))
+                break;
+            argh__c_out(c, "        ");
+            argh__c_words(c, o, "|");
+            argh__c_out(c, ") echo '");
+            for (i = 0; choices && choices[i]; i++)
+            {
+                if (i)
+                    argh__c_out(c, " ");
+                argh__c_out(c, choices[i]);
+            }
+            argh__c_out(c, choices ? "' ;;\n" : "@file' ;;\n");
+            break;
+        case ARGH__C_FISH:
+            argh__c_fish_head(c);
+            if (o->short_name)
+            {
+                argh__c_out(c, " -s ");
+                argh__c_out(c, s);
+            }
+            if (o->long_name)
+            {
+                argh__c_out(c, " -l ");
+                argh__c_out(c, o->long_name);
+            }
+            if (o->help)
+            {
+                argh__c_out(c, " -d ");
+                argh__c_quoted(c, o->help);
+            }
+            if (value && choices)
+            {
+                argh__c_out(c, " -x -a ");
+                argh__c_out(c, "'");
+                for (i = 0; choices[i]; i++)
+                {
+                    if (i)
+                        argh__c_out(c, " ");
+                    argh__c_out(c, choices[i]);
+                }
+                argh__c_out(c, "'");
+            }
+            else if (value)
+            {
+                argh__c_out(c, argh__c_file(o) ? " -r" : " -x");
+            }
+            argh__c_out(c, "\n");
+            if (o->long_name && o->kind == ARGH__K_FLAG && (o->flags & ARGH_NEGATABLE))
+            {
+                argh__c_fish_head(c);
+                argh__c_out(c, " -l no-");
+                argh__c_out(c, o->long_name);
+                argh__c_out(c, "\n");
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    /* Every option visible at the path: the top-level tables, then the
+     * tables of each command on the way, as on the command line */
+    static void argh__c_options(argh__comp *c, int mode)
+    {
+        const argh_opt *o;
+        int t;
+        /* bash lists top-level options once, for every path ("*|-C") */
+        bool once = !c->fish && (mode == ARGH__C_TAKES || mode == ARGH__C_VALS);
+        c->positionals = c->own_v = c->own_version = false;
+        c->any = once;
+        for (t = 0; t < c->p->argh__table_count && !(once && c->depth); t++)
+            for (o = c->p->argh__tables[t]; o && o->kind != ARGH__K_END; o++)
+                argh__c_option(c, o, mode);
+        c->any = false;
+#ifndef ARGH_NO_COMMANDS
+        for (t = 0; t < c->depth; t++)
+            for (o = c->path[t]->opts; o && o->kind != ARGH__K_END; o++)
+                argh__c_option(c, o, mode);
+#endif
+    }
+
+    /* -h/--help and -V/--version, where argh provides them; call after
+     * argh__c_options, which finds out whether the path took -V/--version */
+    static void argh__c_builtins(const argh__comp *c, int mode)
+    {
+        bool v = c->p->argh__version && !c->own_v;
+        bool version = c->p->argh__version && !c->own_version;
+        if (!argh__auto_help(c->p))
+            return;
+        if (mode == ARGH__C_OPTS)
+        {
+            argh__c_out(c, " -h --help");
+            argh__c_out(c, v ? " -V" : "");
+            argh__c_out(c, version ? " --version" : "");
+        }
+        else if (mode == ARGH__C_FISH)
+        {
+            argh__c_fish_head(c);
+            argh__c_out(c, " -s h -l help -d 'Print help'\n");
+            if (!v && !version)
+                return;
+            argh__c_fish_head(c);
+            argh__c_out(c, v ? " -s V" : "");
+            argh__c_out(c, version ? " -l version" : "");
+            argh__c_out(c, " -d 'Print version'\n");
+        }
+    }
+
+    static void argh__c_node(argh__comp *c, const argh_cmd *level, int mode)
+    {
+#ifndef ARGH_NO_COMMANDS
+        const argh_cmd *k;
+#else
+        (void)level;
+#endif
+        switch (mode)
+        {
+        case ARGH__C_CMDS:
+#ifndef ARGH_NO_COMMANDS
+            if (!level || !level->name)
+                break;
+            if (c->fish)
+            {
+                for (k = level; k->name; k++)
+                {
+                    argh__c_out(c, " '");
+                    argh__c_path(c);
+                    argh__c_out(c, "|");
+                    argh__c_out(c, k->name);
+                    argh__c_out(c, "'");
+                }
+                break;
+            }
+            argh__c_out(c, "        \"");
+            argh__c_path(c);
+            argh__c_out(c, "\") echo '");
+            for (k = level; k->name; k++)
+            {
+                if (k != level)
+                    argh__c_out(c, " ");
+                argh__c_out(c, k->name);
+            }
+            argh__c_out(c, "' ;;\n");
+#endif
+            break;
+        case ARGH__C_OPTS:
+            argh__c_out(c, "        \"");
+            argh__c_path(c);
+            argh__c_out(c, "\") echo '");
+            argh__c_options(c, mode);
+            argh__c_builtins(c, mode);
+            argh__c_out(c, " ' ;;\n");
+            break;
+        case ARGH__C_FILES:
+            argh__c_options(c, mode);
+            if (!c->positionals)
+                break;
+            argh__c_out(c, "        \"");
+            argh__c_path(c);
+            argh__c_out(c, "\") return 0 ;;\n");
+            break;
+        case ARGH__C_FISH:
+            argh__c_options(c, mode);
+            argh__c_builtins(c, mode);
+#ifndef ARGH_NO_COMMANDS
+            for (k = level; k && k->name; k++)
+            {
+                argh__c_fish_head(c);
+                argh__c_out(c, " -f -a ");
+                argh__c_out(c, k->name);
+                if (k->help)
+                {
+                    argh__c_out(c, " -d ");
+                    argh__c_quoted(c, k->help);
+                }
+                argh__c_out(c, "\n");
+            }
+#endif
+            /* No file names where nothing takes them */
+            if (!c->positionals)
+            {
+                argh__c_fish_head(c);
+                argh__c_out(c, " -f\n");
+            }
+            break;
+        default:
+            argh__c_options(c, mode);
+            break;
+        }
+    }
+
+    /* The top level, then every command below it, depth first */
+    static void argh__c_walk(argh__comp *c, const argh_cmd *level, int mode)
+    {
+        argh__c_node(c, level, mode);
+#ifndef ARGH_NO_COMMANDS
+        if (c->depth < ARGH_MAX_DEPTH)
+        {
+            const argh_cmd *k;
+            for (k = level; k && k->name; k++)
+            {
+                c->path[c->depth++] = k;
+                argh__c_walk(c, k->subs, mode);
+                c->depth--;
+            }
+        }
+#endif
+    }
+
+    static void argh__c_section(argh__comp *c, const char *fn, const char *head, int mode, const char *tail)
+    {
+        argh__c_out(c, "_");
+        argh__c_out(c, c->fn);
+        argh__c_out(c, fn);
+        argh__c_out(c, head);
+#ifndef ARGH_NO_COMMANDS
+        argh__c_walk(c, c->p->argh__commands, mode);
+#else
+        argh__c_walk(c, NULL, mode);
+#endif
+        argh__c_out(c, tail);
+    }
+
+    /* Script text lives in arrays rather than string literals: literals share
+     * one section the linker can't trim, arrays get their own, so programs
+     * without completion don't carry the text. '%' stands for c->fn. */
+    static const char argh__c_bash_main[] =
+        "_%() {\n"
+        "    local cur=${COMP_WORDS[COMP_CWORD]} prev=${COMP_WORDS[COMP_CWORD-1]} at= i w c v\n"
+        "    for ((i = 1; i < COMP_CWORD; i++)); do\n"
+        "        w=${COMP_WORDS[i]}\n"
+        "        case $w in\n"
+        "            --) break ;;\n"
+        "            -*=*) ;;\n"
+        "            -*) _%_takes \"$at\" \"$w\" && i=$((i + 1)) ;;\n"
+        "            *) for c in $(_%_cmds \"$at\"); do\n"
+        "                   if [[ $c == \"$w\" ]]; then at=${at:+$at }$w; break; fi\n"
+        "               done ;;\n"
+        "        esac\n"
+        "    done\n"
+        "    COMPREPLY=()\n"
+        "    if ((COMP_CWORD > 1)) && _%_takes \"$at\" \"$prev\"; then\n"
+        "        v=$(_%_values \"$at\" \"$prev\")\n"
+        "        if [[ $v == @file ]]; then\n"
+        "            COMPREPLY=($(compgen -f -- \"$cur\"))\n"
+        "        else\n"
+        "            COMPREPLY=($(compgen -W \"$v\" -- \"$cur\"))\n"
+        "        fi\n"
+        "    elif [[ $cur == -* ]]; then\n"
+        "        COMPREPLY=($(compgen -W \"$(_%_opts \"$at\")\" -- \"$cur\"))\n"
+        "    else\n"
+        "        c=$(_%_cmds \"$at\")\n"
+        "        if [[ -n $c ]]; then\n"
+        "            COMPREPLY=($(compgen -W \"$c\" -- \"$cur\"))\n"
+        "        elif _%_files \"$at\"; then\n"
+        "            COMPREPLY=($(compgen -f -- \"$cur\"))\n"
+        "        fi\n"
+        "    fi\n"
+        "}\n";
+
+    static const char argh__c_fish_at[] =
+        "function __%_at\n"
+        "    set -l at ''\n"
+        "    set -l skip 0\n"
+        "    for w in (commandline -opc)[2..-1]\n"
+        "        if test $skip = 1\n"
+        "            set skip 0\n"
+        "            continue\n"
+        "        end\n"
+        "        switch $w\n"
+        "            case '--'\n"
+        "                break\n"
+        "            case '-*=*'\n"
+        "            case '-*'\n"
+        "                contains -- \"$at|$w\" $__%_takes; and set skip 1\n"
+        "            case '*'\n"
+        "                if contains -- \"$at|$w\" $__%_cmds\n"
+        "                    set at (string trim -- \"$at $w\")\n"
+        "                end\n"
+        "        end\n"
+        "    end\n"
+        "    test \"$at\" = \"$argv[1]\"\n"
+        "end\n";
+
+    static void argh__c_template(const argh__comp *c, const char *t)
+    {
+        const char *mark;
+        while ((mark = strchr(t, '%')) != NULL)
+        {
+            argh__outn(c->p, 0, t, (size_t)(mark - t));
+            argh__c_out(c, c->fn);
+            t = mark + 1;
+        }
+        argh__c_out(c, t);
+    }
+
+    static void argh__c_bash(argh__comp *c)
+    {
+        argh__c_section(c, "_cmds", "() {\n    case \"$1\" in\n", ARGH__C_CMDS, "    esac\n}\n");
+        argh__c_section(c, "_opts", "() {\n    case \"$1\" in\n", ARGH__C_OPTS, "    esac\n}\n");
+        argh__c_section(c, "_takes", "() {\n    case \"$1|$2\" in\n", ARGH__C_TAKES, "    esac\n    return 1\n}\n");
+        argh__c_section(c, "_values", "() {\n    case \"$1|$2\" in\n", ARGH__C_VALS, "    esac\n}\n");
+        argh__c_section(c, "_files", "() {\n    case \"$1\" in\n", ARGH__C_FILES, "    esac\n    return 1\n}\n");
+        argh__c_template(c, argh__c_bash_main);
+        argh__c_out(c, "complete -F _");
+        argh__c_out(c, c->fn);
+        argh__c_out(c, " ");
+        argh__c_out(c, c->name);
+        argh__c_out(c, "\n");
+    }
+
+    static void argh__c_fish(argh__comp *c)
+    {
+        c->fish = true;
+        argh__c_out(c, "set -g _");
+        argh__c_section(c, "_cmds", "", ARGH__C_CMDS, "\n");
+        argh__c_out(c, "set -g _");
+        argh__c_section(c, "_takes", "", ARGH__C_TAKES, "\n");
+        argh__c_template(c, argh__c_fish_at);
+        argh__c_out(c, "complete -c ");
+        argh__c_out(c, c->name);
+        argh__c_out(c, " -e\n");
+#ifndef ARGH_NO_COMMANDS
+        argh__c_walk(c, c->p->argh__commands, ARGH__C_FISH);
+#else
+        argh__c_walk(c, NULL, ARGH__C_FISH);
+#endif
+    }
+
+    ARGH__DEF bool argh_print_completion(const argh_parser *p, const char *shell)
+    {
+        argh__comp c;
+        size_t i;
+        bool zsh = shell && strcmp(shell, "zsh") == 0;
+
+        if (!shell || (!zsh && strcmp(shell, "bash") != 0 && strcmp(shell, "fish") != 0))
+            return false;
+        memset(&c, 0, sizeof(c));
+        c.p = p;
+        c.name = p->argh__name ? p->argh__name : "program";
+        for (i = 0; c.name[i] && i + 1 < sizeof(c.fn); i++)
+            c.fn[i] = isalnum((unsigned char)c.name[i]) ? c.name[i] : '_';
+
+        argh__c_out(&c, "# ");
+        argh__c_out(&c, shell);
+        argh__c_out(&c, " completion for ");
+        argh__c_out(&c, c.name);
+        argh__c_out(&c, ", generated by aargh (argh.h). Load it with:\n#   ");
+        if (shell[0] == 'f')
+        {
+            argh__c_out(&c, c.name);
+            argh__c_out(&c, " --completions fish | source\n");
+            argh__c_fish(&c);
+            return true;
+        }
+        argh__c_out(&c, "source <(");
+        argh__c_out(&c, c.name);
+        argh__c_out(&c, " --completions ");
+        argh__c_out(&c, shell);
+        argh__c_out(&c, ")\n");
+        /* zsh runs the bash script through its bash compatibility layer */
+        if (zsh)
+            argh__c_out(&c, "autoload -U +X bashcompinit && bashcompinit\n");
+        argh__c_bash(&c);
+        return true;
+    }
+
+    static const argh__completer argh__the_completer = {argh__shells, argh_print_completion};
+
+    ARGH__DEF argh_opt *argh_completions(argh_parser *p)
+    {
+        /* The target is never written: it only makes the entry an option */
+        argh_opt *o = argh__add(p, 0, "completions", ARGH__K_COMPLETE, (void *)&argh__the_completer,
+                                &argh__the_completer, "Print a completion script for bash, zsh or fish");
+        return argh_metavar(o, "<shell>");
+    }
+#else
+    /* ARGH_NO_COMPLETION, or firmware (ARGH_NO_STDIO): no shell to complete in */
+    ARGH__DEF bool argh_print_completion(const argh_parser *p, const char *shell)
+    {
+        (void)p;
+        (void)shell;
+        return false;
+    }
+
+    ARGH__DEF argh_opt *argh_completions(argh_parser *p)
+    {
+        (void)p;
+        return NULL;
+    }
+#endif
 
 #undef ARGH__EACH
 #undef ARGH__EACH_T

@@ -6,6 +6,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- Shell completion: `argh_completions(&p)` adds `--completions <shell>`, which prints a completion script for bash, zsh or fish and exits like `--help`. It completes options (and `--no-` forms), commands at every level, enum choices, and file names for strings and positionals; fish shows each option's help. `argh_print_completion(&p, shell)` prints a script for your own command or install step. Scripts are generated from the tables, so Tab never runs the program.
+- `ARGH_NO_COMPLETION` removes completion entirely. Its code is linked only when used; its text adds about 0.6 KB to desktop programs unless removed. Firmware (`ARGH_NO_STDIO`) never has it.
+- `pkg` example: `pkg --completions bash|zsh|fish`. CI loads the scripts in bash, zsh and fish and checks what Tab offers (`make completion-check`).
+
 ## [1.9.0] - 2026-10-03
 
 ### Changed
