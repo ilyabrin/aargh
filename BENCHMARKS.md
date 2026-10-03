@@ -17,18 +17,18 @@ The workload: 30 options defined, 17 arguments on the command line (short and lo
 
 argh is measured two ways: with builder calls (`argh_int(&p, ...)`) and with a `static const` table (`ARGH_INT(...)`).
 
-Release builds (`-O2 -DNDEBUG`) of v1.6 on CI runners. CI machines differ from run to run, so each row comes from a single run: the one with the median argh-to-getopt ratio out of five.
+Release builds (`-O2 -DNDEBUG`) of v1.7 on CI runners. CI machines differ from run to run, so each row comes from a single run: the one with the median argh-to-getopt ratio out of five.
 
 | Platform           | argh (table) | argh (builder) | getopt_long |
 | ------------------ | -----------: | -------------: | ----------: |
-| macOS, Clang       |       397 ns |         434 ns |      474 ns |
-| Linux, Clang       |       543 ns |         611 ns |      631 ns |
-| Linux, GCC         |       535 ns |         657 ns |      565 ns |
-| Linux ARM64, Clang |       469 ns |         539 ns |      453 ns |
-| Linux ARM64, GCC   |       495 ns |         587 ns |      437 ns |
-| Windows, MinGW GCC |       907 ns |         984 ns |      887 ns |
+| macOS, Clang       |       506 ns |         594 ns |      673 ns |
+| Linux, Clang       |       375 ns |         409 ns |      466 ns |
+| Linux, GCC         |       575 ns |         649 ns |      625 ns |
+| Linux ARM64, Clang |       433 ns |         493 ns |      451 ns |
+| Linux ARM64, GCC   |       455 ns |         540 ns |      436 ns |
+| Windows, MinGW GCC |       887 ns |         945 ns |      894 ns |
 
-At the median, argh with a table is 16% faster than `getopt_long` on macOS, 14% faster with Clang and 5% faster with GCC on Linux x86-64, 2% slower with MinGW, and 4% (Clang) to 13% (GCC) slower on Linux ARM64; across all five runs the range is 18% faster to 15% slower. That is while also validating every value and supporting commands, rules and generated help. In absolute terms the difference is a fraction of a microsecond, once, at program start. The builder costs a little more than the table because it fills in the option list on every run.
+At the median, argh with a table is 25% faster than `getopt_long` on macOS, 20% faster with Clang and 8% faster with GCC on Linux x86-64, 4% faster with Clang on Linux ARM64, 1% faster with MinGW, and 4% slower with GCC on Linux ARM64; across all five runs the range is 28% faster to 5% slower. That is while also validating every value and supporting commands, rules and generated help. In absolute terms the difference is a fraction of a microsecond, once, at program start. The builder costs a little more than the table because it fills in the option list on every run.
 
 ### Between versions
 
@@ -45,7 +45,7 @@ On one machine (Intel Core i5-12400F, Windows 11, MinGW GCC 13.2), best of 9 alt
 | v1.5.0 → v1.6.0 | 810 → 817 ns (same)        | 871 → 883 ns (same)        | 807 → 809 ns          |
 | v1.6.0 → v1.7.0 | 816 → 775 ns (**−5%**)     | 891 → 836 ns (**−6%**)     | 819 → 807 ns          |
 
-Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use. v1.1 and v1.2 leave the parse path of release builds unchanged (they add to help output only); v1.3 adds one pass over the options for environment variables, within the noise. v1.4 parses integers with its own digit loop instead of `strtol`, which closes the gap to `getopt_long` on MinGW. v1.5 and v1.6 look for an optional value or a range only in the entries right after an option, which costs nothing measurable. v1.7 runs about 9% fewer instructions per parse (callgrind): long names are compared in place instead of with `strncmp`, and the per-parse definition checks pass the usual option on a few compares. The CI timings above are from v1.6; with v1.0 MinGW was 7% slower than `getopt_long`.
+Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use. v1.1 and v1.2 leave the parse path of release builds unchanged (they add to help output only); v1.3 adds one pass over the options for environment variables, within the noise. v1.4 parses integers with its own digit loop instead of `strtol`, which closes the gap to `getopt_long` on MinGW. v1.5 and v1.6 look for an optional value or a range only in the entries right after an option, which costs nothing measurable. v1.7 runs about 9% fewer instructions per parse (callgrind): long names are compared in place instead of with `strncmp`, and the per-parse definition checks pass the usual option on a few compares. The CI timings above are from v1.7. Earlier medians on the same runners: MinGW 7% slower than `getopt_long` with v1.0, ARM64 GCC 13% slower with v1.6.
 
 ### Debug builds
 
@@ -78,8 +78,8 @@ The `.text` added to a minimal 3-option program, compared with the same program 
 | Linux, GCC 13.3 (CI)         | 19.1 KB |      16.0 KB |      0.6 KB |
 | Linux, Clang 18.1 (CI)       | 24.0 KB |      19.0 KB |      0.5 KB |
 | Linux ARM64, GCC 13.3 (CI)   | 19.8 KB |              |      0.6 KB |
-| Linux ARM64, Clang 18.1 (CI) | 22.2 KB |              |      0.5 KB |
-| Windows, MinGW GCC 15.2 (CI) | 20.0 KB |              |     28.0 KB |
+| Linux ARM64, Clang 18.1 (CI) | 22.0 KB |              |      0.5 KB |
+| Windows, MinGW GCC 15.2 (CI) | 19.9 KB |              |     28.0 KB |
 
 "Reduced" is `-DARGH_NO_COMMANDS -DARGH_NO_SUGGEST`, for programs that don't need commands or "did you mean" suggestions. What each option saves on Linux GCC: `ARGH_NO_COMMANDS` 2.3 KB, `ARGH_NO_SUGGEST` 0.8 KB, `ARGH_NO_FLOAT` 0.4 KB (far more on firmware, see below), `ARGH_HELP_WIDTH=0` 0.2 KB. Debug builds are about 2.5 KB larger: they also check your definitions and examples.
 
