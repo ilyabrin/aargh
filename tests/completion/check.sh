@@ -60,7 +60,9 @@ printf '%s\n' "${COMPREPLY[@]}" | LC_ALL=C sort | tr '\n' ' '
 EOF
 check bash bash "$OUT/bash.sh"
 
-# zsh: through bashcompinit, which runs the function under `emulate sh`
+# zsh: through bashcompinit, which runs the function under `emulate sh`.
+# Its compgen -W leaves the prefix to compadd, which keeps only the words
+# that start with what was typed; the grep does that part here.
 cat >"$OUT/zsh.sh" <<'EOF'
 autoload -U +X bashcompinit && bashcompinit
 source <(pkg --completions zsh)
@@ -69,7 +71,7 @@ complete_words() {
     eval "COMP_WORDS=($1)"
     COMP_CWORD=$((${#COMP_WORDS[@]} - 1))
     _pkg
-    printf '%s\n' "${COMPREPLY[@]}" | LC_ALL=C sort | tr '\n' ' '
+    printf '%s\n' "${COMPREPLY[@]}" | awk -v p="${COMP_WORDS[COMP_CWORD]}" 'index($0, p) == 1' | LC_ALL=C sort | tr '\n' ' '
 }
 complete_words "$1"
 EOF
