@@ -34,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm docs-check fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check coverage fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -95,6 +95,10 @@ bench_parse$(EXE): bench/bench_parse.c argh.h
 # Code and output in README.md, examples/README.md and llms.txt
 docs-check:
 	$(PYTHON) tests/docs/check_docs.py --cc $(CC)
+
+# Line coverage of argh.h by the unit tests (gcc and gcov); fails below 98%
+coverage:
+	sh tests/coverage.sh
 
 size-arm:
 	sh bench/size_arm.sh
