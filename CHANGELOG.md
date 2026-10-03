@@ -9,6 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - Install with your build system: a CMake package (`argh::argh` through `FetchContent`, `add_subdirectory` or `find_package` after `cmake --install`, version-checked as SemVer), `argh.pc` for pkg-config, and a `meson.build` for Meson subprojects. The version comes from argh.h. As a dependency argh builds and installs nothing; built on its own, CMake runs the tests with `ctest`.
+- Conan 2: `conan create .` packages argh from the repository (header-only, `argh::argh` for CMakeDeps, `argh` for pkg-config), with a test_package. clib: `clib install ilyabrin/argh`.
 - CI builds and runs a program through each of these on Linux and Windows (`make package-check`).
 
 ## [1.7.0] - 2026-10-03
