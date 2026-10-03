@@ -43,8 +43,9 @@ On one machine (Intel Core i5-12400F, Windows 11, MinGW GCC 13.2), best of 9 alt
 | v1.3.0 → v1.4.0 | 863 → 805 ns (**−7%**)     | 934 → 879 ns (**−6%**)     | 805 → 800 ns          |
 | v1.4.0 → v1.5.0 | 808 → 806 ns (same)        | 888 → 872 ns (same)        | 808 → 804 ns          |
 | v1.5.0 → v1.6.0 | 810 → 817 ns (same)        | 871 → 883 ns (same)        | 807 → 809 ns          |
+| v1.6.0 → v1.7.0 | 816 → 775 ns (**−5%**)     | 891 → 836 ns (**−6%**)     | 819 → 807 ns          |
 
-Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use. v1.1 and v1.2 leave the parse path of release builds unchanged (they add to help output only); v1.3 adds one pass over the options for environment variables, within the noise. v1.4 parses integers with its own digit loop instead of `strtol`, which closes the gap to `getopt_long` on MinGW. v1.5 and v1.6 look for an optional value or a range only in the entries right after an option, which costs nothing measurable. The CI timings above are from v1.6; with v1.0 MinGW was 7% slower than `getopt_long`.
+Each row was measured on its own day with both versions side by side; `getopt_long` shows how steady the machine was. v1.0 got faster after profiling: the checks for names reserved by `--help` and `--version` no longer call `strcmp` for every option on every parse, and `argh_init` no longer clears builder storage that table-only programs don't use. v1.1 and v1.2 leave the parse path of release builds unchanged (they add to help output only); v1.3 adds one pass over the options for environment variables, within the noise. v1.4 parses integers with its own digit loop instead of `strtol`, which closes the gap to `getopt_long` on MinGW. v1.5 and v1.6 look for an optional value or a range only in the entries right after an option, which costs nothing measurable. v1.7 runs about 9% fewer instructions per parse (callgrind): long names are compared in place instead of with `strncmp`, and the per-parse definition checks pass the usual option on a few compares. The CI timings above are from v1.6; with v1.0 MinGW was 7% slower than `getopt_long`.
 
 ### Debug builds
 
@@ -70,19 +71,19 @@ v0.1 copied every value to the heap and looked options up by name twice: once wh
 
 ## Code size
 
-The `.text` added to a minimal 3-option program, compared with the same program without a parser. Release builds: `-Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections`, v1.6:
+The `.text` added to a minimal 3-option program, compared with the same program without a parser. Release builds: `-Os -DNDEBUG -ffunction-sections -fdata-sections -Wl,--gc-sections`, v1.7:
 
 | Platform                     | argh    | argh reduced | getopt_long |
 | ---------------------------- | ------: | -----------: | ----------: |
-| Linux, GCC 13.3 (CI)         | 19.3 KB |      16.3 KB |      0.6 KB |
-| Linux, Clang 18.1 (CI)       | 24.1 KB |      19.2 KB |      0.5 KB |
+| Linux, GCC 13.3 (CI)         | 19.1 KB |      16.0 KB |      0.6 KB |
+| Linux, Clang 18.1 (CI)       | 24.0 KB |      19.0 KB |      0.5 KB |
 | Linux ARM64, GCC 13.3 (CI)   | 19.8 KB |              |      0.6 KB |
 | Linux ARM64, Clang 18.1 (CI) | 22.2 KB |              |      0.5 KB |
 | Windows, MinGW GCC 15.2 (CI) | 20.0 KB |              |     28.0 KB |
 
 "Reduced" is `-DARGH_NO_COMMANDS -DARGH_NO_SUGGEST`, for programs that don't need commands or "did you mean" suggestions. What each option saves on Linux GCC: `ARGH_NO_COMMANDS` 2.3 KB, `ARGH_NO_SUGGEST` 0.8 KB, `ARGH_NO_FLOAT` 0.4 KB (far more on firmware, see below), `ARGH_HELP_WIDTH=0` 0.2 KB. Debug builds are about 2.5 KB larger: they also check your definitions and examples.
 
-Linux GCC at each release, as measured then: v0.1 7.3 KB, v0.2 12.1 KB, v0.3 17.1 KB, v0.4 17.6 KB, v1.0 17.7 KB, all without `NDEBUG`. From v1.1, release builds: v1.0 16.7 KB, v1.1 16.9 KB (the help section for examples), v1.2 17.3 KB (wrapping long help), v1.3 18.3 KB (environment variables), v1.4 18.6 KB (unsigned types, own integer parsing), v1.5 18.8 KB (optional values), v1.6 19.3 KB (ranges).
+Linux GCC at each release, as measured then: v0.1 7.3 KB, v0.2 12.1 KB, v0.3 17.1 KB, v0.4 17.6 KB, v1.0 17.7 KB, all without `NDEBUG`. From v1.1, release builds: v1.0 16.7 KB, v1.1 16.9 KB (the help section for examples), v1.2 17.3 KB (wrapping long help), v1.3 18.3 KB (environment variables), v1.4 18.6 KB (unsigned types, own integer parsing), v1.5 18.8 KB (optional values), v1.6 19.3 KB (ranges), v1.7 19.1 KB (fewer instructions per parse).
 
 Read this one with care:
 
@@ -97,9 +98,9 @@ Flash added to a bare-metal firmware shell command with three options, compared 
 
 | Build                                                                 | Cortex-M0 | Cortex-M4 |  Budget |
 | --------------------------------------------------------------------- | --------: | --------: | ------: |
-| `ARGH_NO_FLOAT`                                                       |   11.5 KB |   11.7 KB | 12.0 KB |
-| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST`, `ARGH_HELP_WIDTH=0` |    9.5 KB |    9.9 KB | 10.0 KB |
-| with `argh_double` (`ARGH_NO_STDIO` only)                             |   38.6 KB |   32.2 KB |       - |
+| `ARGH_NO_FLOAT`                                                       |   11.5 KB |   11.8 KB | 12.0 KB |
+| `ARGH_NO_FLOAT ARGH_NO_COMMANDS ARGH_NO_SUGGEST`, `ARGH_HELP_WIDTH=0` |    9.4 KB |    9.8 KB | 10.0 KB |
+| with `argh_double` (`ARGH_NO_STDIO` only)                             |   38.6 KB |   32.3 KB |       - |
 
 - **Numbers include everything linked because of argh**: help and error strings, and the C library functions it calls (`strcmp`, `memcpy` and others).
 - **Why doubles cost 27 KB:** newlib's `strtod` brings its float parser and soft-float arithmetic, and through an internal `assert` also `fprintf`. `ARGH_NO_FLOAT` removes `argh_double` so none of it is linked.
