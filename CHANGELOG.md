@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-10-03
+
 ### Changed
 
 - The project is now **aargh**, after the snail's cry when salt hits it; the repository moved to github.com/ilyabrin/aargh (old links redirect). The name `argh` belongs to another library, a C++ parser, in vcpkg, ConanCenter and xmake-repo. The header stays `argh.h` and the API stays `argh_*` / `ARGH_*`: no code changes.
@@ -224,7 +226,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/ilyabrin/aargh/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ilyabrin/aargh/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/ilyabrin/aargh/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/ilyabrin/aargh/compare/v1.5.0...v1.6.0
