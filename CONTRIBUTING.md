@@ -22,6 +22,7 @@ make test     # build and run the test suite
 make smoke    # run the examples and check their output
 make cxx      # check that argh.h compiles as C++
 make coverage # lines of argh.h the tests run; lists the ones they miss
+make package-check # use argh through CMake, pkg-config and Meson
 make bench    # run benchmarks (speed and code size)
 make clean
 ```

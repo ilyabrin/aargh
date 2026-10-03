@@ -62,6 +62,30 @@ jobs:
       - uses: actions/checkout@v7
       - run: make coverage
 
+  # Every documented way to use argh as a package, built and run
+  packaging:
+    name: packaging / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Meson (Linux)
+        if: runner.os == 'Linux'
+        run: pipx install meson && sudo apt-get install -y ninja-build
+      - name: Tests through CMake and CTest
+        shell: bash
+        run: |
+          cmake -S . -B build
+          cmake --build build --config Debug
+          ctest --test-dir build -C Debug --output-on-failure
+      - name: find_package, FetchContent, add_subdirectory, pkg-config, Meson
+        shell: bash
+        # Linux has every tool, so a missing one fails there
+        run: ARGH_PACKAGE_STRICT=${{ runner.os == 'Linux' && '1' || '0' }} sh tests/package/check.sh
+
   # 32-bit x86: 4-byte long and pointers, the sizes most firmware has
   x86-32:
     name: ubuntu / gcc -m32

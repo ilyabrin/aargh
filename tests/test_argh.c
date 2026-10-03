@@ -3433,11 +3433,12 @@ TEST(test_command_config_twice_and_positionals)
 #ifndef NDEBUG
 TEST(test_example_too_long)
 {
-    char words[ARGH__EXAMPLE_WORDS * 3 + 8] = "prog";
+    char words[ARGH__EXAMPLE_WORDS * 2 + 8] = "prog";
+    size_t n = 4;
     int i;
     argh_parser p;
-    for (i = 0; i < ARGH__EXAMPLE_WORDS; i++)
-        strcat(words, " a");
+    for (i = 0; i < ARGH__EXAMPLE_WORDS; i++, n += 2)
+        memcpy(words + n, " a", 3);
     /* 33 words with the program name: one more than an example may have */
     setup(&p);
     ASSERT_TRUE(strstr(example_error(&p, words), "an example needs at most 256 characters, 32 words") != NULL);
