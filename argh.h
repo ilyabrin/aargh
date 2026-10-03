@@ -886,9 +886,15 @@ extern "C"
     {
         ARGH__EACH(p, o, i)
         {
-            /* The first-character check skips most strncmp calls */
-            if (argh__is_option_kind(o->kind) && o->long_name && o->long_name[0] == name[0] &&
-                strncmp(o->long_name, name, len) == 0 && o->long_name[len] == '\0')
+            /* Compared in place: names are short, and most differ in the
+             * first character, so a call to strncmp costs more than it saves */
+            const char *l = o->long_name;
+            size_t k = 0;
+            if (!l || l[0] != name[0] || !argh__is_option_kind(o->kind))
+                continue;
+            while (k < len && l[k] == name[k])
+                k++;
+            if (k == len && l[len] == '\0')
             {
                 *index = i;
                 return o;
@@ -1791,26 +1797,33 @@ extern "C"
         if (p->argh__setup_problem == ARGH__P_BUILDER)
             return argh__config_error(p, "more builder options than ARGH_BUILDER_CAP", NULL);
 
+        /* Runs on every parse, so the usual option gets through on a few
+         * compares: reserved names are tested by first letter before strcmp */
+        bool reserved = argh__auto_help(p);
+        bool version = reserved && p->argh__version;
         ARGH__EACH(p, o, index)
         {
+            const char *l = o->long_name;
             (void)index;
             total++;
-            if (argh__auto_help(p) && argh__is_option_kind(o->kind))
+            if (!o->target)
             {
-                /* Runs on every parse: test the first letter before strcmp */
-                const char *l = o->long_name;
-                bool clash = o->short_name == 'h' || (l && l[0] == 'h' && strcmp(l, "help") == 0);
-                if (p->argh__version)
-                    clash = clash || o->short_name == 'V' || (l && l[0] == 'v' && strcmp(l, "version") == 0);
-                if (clash)
-                    return argh__config_error(p, "name reserved for help/version, see ARGH_NO_AUTO_HELP", o);
+                if (o->kind != ARGH__K_GROUP && o->kind != ARGH__K_EXAMPLE)
+                    return argh__config_error(p, "option has no target variable", o);
+                continue;
             }
-            if (!o->target && o->kind != ARGH__K_GROUP && o->kind != ARGH__K_EXAMPLE)
-                return argh__config_error(p, "option has no target variable", o);
-            if (o->kind == ARGH__K_CUSTOM && (!o->extra || !((const argh_type *)o->extra)->parse))
-                return argh__config_error(p, "custom option has no argh_type with a parse function", o);
-            if (o->kind == ARGH__K_ENUM && !o->extra)
-                return argh__config_error(p, "enum option has no choices", o);
+            /* Enums and custom types need extra; one compare skips the kinds before them */
+            if (o->kind >= ARGH__K_ENUM)
+            {
+                if (o->kind == ARGH__K_ENUM && !o->extra)
+                    return argh__config_error(p, "enum option has no choices", o);
+                if (o->kind == ARGH__K_CUSTOM && (!o->extra || !((const argh_type *)o->extra)->parse))
+                    return argh__config_error(p, "custom option has no argh_type with a parse function", o);
+            }
+            if (reserved && argh__is_option_kind(o->kind) &&
+                (o->short_name == 'h' || (version && o->short_name == 'V') ||
+                 (l && ((l[0] == 'h' && strcmp(l, "help") == 0) || (version && l[0] == 'v' && strcmp(l, "version") == 0)))))
+                return argh__config_error(p, "name reserved for help/version, see ARGH_NO_AUTO_HELP", o);
         }
         if (total > ARGH_MAX_OPTS)
             return argh__config_error(p, "more options than ARGH_MAX_OPTS", NULL);
@@ -1836,14 +1849,18 @@ extern "C"
     /* Checks that need the selected command path */
     static int argh__check_path(argh_parser *p)
     {
-        int total = 0;
-        ARGH__EACH(p, o, index)
+        /* Without a command, argh__check_config has counted these already */
+        if (ARGH__DEPTH(p))
         {
-            (void)o;
-            total = index + 1;
+            int total = 0;
+            ARGH__EACH(p, o, index)
+            {
+                (void)o;
+                total = index + 1;
+            }
+            if (total > ARGH_MAX_OPTS)
+                return argh__config_error(p, "more options than ARGH_MAX_OPTS on this command path", NULL);
         }
-        if (total > ARGH_MAX_OPTS)
-            return argh__config_error(p, "more options than ARGH_MAX_OPTS on this command path", NULL);
         if (argh__level_commands(p))
             return argh__fail(p, ARGH_E_MISSING_COMMAND, -1, NULL, NULL, 0);
         return argh__check_duplicates(p);
@@ -2042,9 +2059,12 @@ extern "C"
                     (a[2] == 'v' && strncmp(a + 2, "version", 7) == 0))
                     return true;
             }
-            else if (strchr(a, 'h') || strchr(a, 'V'))
+            else
             {
-                return true;
+                /* -h or -V anywhere in a cluster, one pass */
+                for (a++; *a; a++)
+                    if (*a == 'h' || *a == 'V')
+                        return true;
             }
         }
         return false;
