@@ -64,7 +64,8 @@ fi
 
 if ! command -v "${CC:-cc}" >/dev/null 2>&1; then
     skip "pkg-config" "${CC:-cc}"
-elif command -v pkg-config >/dev/null 2>&1 && [ -f "$OUT/prefix/share/pkgconfig/argh.pc" ]; then
+# --version: some installs are present but broken (Strawberry Perl's under Git Bash)
+elif pkg-config --version >/dev/null 2>&1 && [ -f "$OUT/prefix/share/pkgconfig/argh.pc" ]; then
     flags=$(PKG_CONFIG_PATH="$OUT/prefix/share/pkgconfig" pkg-config --cflags argh)
     pcver=$(PKG_CONFIG_PATH="$OUT/prefix/share/pkgconfig" pkg-config --modversion argh)
     [ "$pcver" = "$VERSION" ] || bad "pkg-config version $pcver"
