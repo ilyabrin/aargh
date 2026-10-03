@@ -143,22 +143,23 @@ Usage: pkg remote add [OPTIONS] <name> <url>
 Add a package source
 
 Arguments:
-  <name>                Short name, such as origin
-  <url>                 Where the packages come from
+  <name>                     Short name, such as origin
+  <url>                      Where the packages come from
 
 Options:
-  -f, --force           Replace a remote with the same name
+  -f, --force                Replace a remote with the same name
 
 Global options:
-  -v, --verbose         More output, repeat for more
-  -C <dir>              Run as if started in this directory (default: .)
-      --registry <url>  Package registry URL [env: PKG_REGISTRY]
-      --offline         Use only the local cache
+  -v, --verbose              More output, repeat for more
+  -C <dir>                   Run as if started in this directory (default: .)
+      --registry <url>       Package registry URL [env: PKG_REGISTRY]
+      --offline              Use only the local cache
       --color <auto|always|never>
-                        When to use colors (default: auto)
+                             When to use colors (default: auto)
+      --completions <shell>  Print a completion script for bash, zsh or fish
 
-  -h, --help            Print help
-  -V, --version         Print version
+  -h, --help                 Print help
+  -V, --version              Print version
 
 Examples:
   pkg remote add origin https://pkgs.example.com

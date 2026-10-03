@@ -78,5 +78,8 @@ int main(void)
     argh_long(&p, 'r', "rate", &rate, "Baud rate");
     fails += check(argh_parse(&p, 3, argv) && rate == 115200, 16);
 
+    /* No shell on firmware: no --completions, no script */
+    fails += check(argh_completions(&p) == NULL && !argh_print_completion(&p, "bash"), 64);
+
     return fails;
 }

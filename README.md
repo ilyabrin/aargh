@@ -333,6 +333,48 @@ Try 'tool --help' for more information.
 - Help shows the range as the value name, unless you set one with `argh_metavar`.
 - With `ARGH_IMPLICIT`, the two entries can come in either order after the option. Without `NDEBUG` argh checks that the range follows an integer option and fits its type.
 
+### Shell completion
+
+One call gives your program `--completions <shell>`, which prints a completion script for bash, zsh or fish:
+
+<!-- docs-check: source=tests/docs/completetool.c -->
+```c
+argh_enum(&p, 'f', "format", &format, formats, "Output format");
+argh_string(&p, 'o', "output", &output, "Output file");
+argh_completions(&p);   /* adds --completions <shell> */
+```
+
+<!-- docs-check: program=completetool -->
+```console
+$ ./tool --help
+Usage: tool [OPTIONS]
+
+Options:
+  -f, --format <text|json>   Output format (default: text)
+  -o, --output <value>       Output file
+      --completions <shell>  Print a completion script for bash, zsh or fish
+
+  -h, --help                 Print help
+
+$ ./tool --completions tcsh
+tool: invalid value 'tcsh' for '--completions': expected one of: bash, zsh, fish
+Try 'tool --help' for more information.
+```
+
+Your users load the script once:
+
+```sh
+source <(tool --completions bash)          # in ~/.bashrc
+source <(tool --completions zsh)           # in ~/.zshrc
+tool --completions fish > ~/.config/fish/completions/tool.fish
+```
+
+- Tab then completes options (with `--no-` for negatable flags), commands and subcommands at every level, the choices of an enum, and file names for string options and positional arguments. fish also shows each option's help text. Hidden options stay hidden.
+- `--completions` works like `--help`: it prints and exits with 0 even when required options are missing.
+- The scripts are generated from your tables, so they never fall out of date with the program, and Tab never runs your program. Regenerate them when you install a new version.
+- For your own scheme, such as a `completion` command or an install step, call `argh_print_completion(&p, "bash")`; it returns false for a shell it doesn't know.
+- Pay for what you use: the generator is linked only when you call one of the two. Its text adds about 0.6 KB to desktop programs either way, which `ARGH_NO_COMPLETION` removes. Firmware (`ARGH_NO_STDIO`) has no shell, so there it is always left out.
+
 ### Environment variables
 
 Let an option fall back to an environment variable, the way tools take settings in containers and CI:
@@ -739,6 +781,7 @@ Define before including `argh.h`, the same way in every file that includes it. T
 | `ARGH_MAX_DEPTH`    |       4 | Levels of nested commands                                                      |
 | `ARGH_NO_SUGGEST`   |         | Define to remove "did you mean" suggestions (about 0.8 KB)                     |
 | `ARGH_NO_COMMANDS`  |         | Define to remove commands (about 2.3 KB) if you don't use them                 |
+| `ARGH_NO_COMPLETION` |        | Define to remove shell completion scripts (about 0.6 KB of text)               |
 | `ARGH_NO_STDIO`     |         | Define to build without `<stdio.h>`, see [Microcontrollers](#microcontrollers) |
 | `ARGH_NO_FLOAT`     |         | Define to remove `argh_double` and floating point (27 KB on newlib firmware)   |
 | `ARGH_STATIC`       |         | Define to include the implementation with every function `static`              |
@@ -787,6 +830,7 @@ argh_opt *argh_example(argh_parser *p, const char *command, const char *help);  
 argh_opt *argh_env    (argh_parser *p, void *target, const char *name);          /* fallback for target's option */
 argh_opt *argh_implicit(argh_parser *p, void *target, const char *value);      /* right after it: value optional */
 argh_opt *argh_range   (argh_parser *p, void *target, long lo, long hi);       /* right after it: lo..hi only */
+argh_opt *argh_completions(argh_parser *p);                                    /* --completions <shell> */
 
 /* Modifiers: accept NULL, return their argument */
 argh_opt *argh_required(argh_opt *o);
@@ -805,6 +849,7 @@ int argh_run(argh_parser *p, void *user);                     /* calls its handl
 const argh_error *argh_last_error(const argh_parser *p);
 size_t argh_format_error(const argh_parser *p, char *buf, size_t size);  /* returns the full length */
 void argh_print_help(const argh_parser *p);
+bool argh_print_completion(const argh_parser *p, const char *shell);  /* "bash", "zsh", "fish" */
 ```
 
 ### Macros
@@ -986,6 +1031,7 @@ make size-arm   # flash added to ARM firmware, checked against budgets
 make docs-check # README examples and llms.txt match the code (Python 3)
 make coverage   # lines of argh.h the tests run, at least 98% (gcc, gcov)
 make package-check # CMake, pkg-config, Conan and Meson builds of a program that uses argh
+make completion-check # the completion scripts in bash, zsh and fish
 ```
 
 With CMake instead of make, on any platform: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
