@@ -34,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm docs-check coverage package-check fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -103,6 +103,10 @@ coverage:
 # argh as a package: CMake, pkg-config, Conan and Meson (skips tools you lack)
 package-check:
 	sh tests/package/check.sh
+
+# Completion scripts loaded in bash, zsh and fish (skips shells you lack)
+completion-check:
+	sh tests/completion/check.sh
 
 size-arm:
 	sh bench/size_arm.sh

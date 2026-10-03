@@ -236,6 +236,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
     argh_range(&p, &v.jobs, -1, 1000);
     argh_long(&p, 's', "seek", &v.seek, "Seek");
     argh_uint(&p, 0, "retries", &v.retries, "Retries");
+    argh_completions(&p);
     argh_size(&p, 0, "limit", &v.limit, "Limit");
     argh_implicit(&p, &v.limit, "4096");
 #ifndef ARGH_NO_FLOAT

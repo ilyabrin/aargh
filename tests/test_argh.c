@@ -3446,6 +3446,176 @@ TEST(test_example_too_long)
 }
 #endif
 
+/* ============================================================================
+ * Shell completion
+ * ============================================================================ */
+
+#if !defined(ARGH_NO_STDIO) && !defined(ARGH_NO_COMPLETION)
+
+static const char *const sc_modes[] = {"fast", "safe", NULL};
+static bool sc_color, sc_secret;
+static int sc_mode, sc_level;
+static const char *sc_out;
+static const char *sc_input;
+static const argh_opt sc_opts[] = {
+    ARGH_FLAG(0, "color", &sc_color, "Colored output", ARGH_NEGATABLE),
+    ARGH_ENUM('m', "mode", &sc_mode, sc_modes, "Don't guess the mode"),
+    ARGH_STRING('o', "output", &sc_out, "Output file", ARGH_REQUIRED),
+    ARGH_INT(0, "level", &sc_level, "Level"),
+    ARGH_IMPLICIT(&sc_level, "6"),
+    ARGH_FLAG(0, "secret", &sc_secret, "Not in help", ARGH_HIDDEN),
+    ARGH_POS("input", &sc_input, "Input file"),
+    ARGH_END,
+};
+
+static argh_parser sc_p;
+
+static bool sc_parse(const char *name, int argc, char **argv)
+{
+    reset_output();
+    argh_init(&sc_p, name, NULL);
+    argh_set_writer(&sc_p, capture, NULL);
+    argh_table(&sc_p, sc_opts);
+    argh_completions(&sc_p);
+    return argh_parse(&sc_p, argc, argv);
+}
+
+TEST(test_completions_print_like_help)
+{
+    ARGV("--completions", "bash");
+    /* --output is required and missing: the script still comes out */
+    ASSERT_FALSE(sc_parse("prog", argc, argv));
+    ASSERT_EQ(argh_exit_code(&sc_p), 0);
+    ASSERT_EQ(argh_last_error(&sc_p)->code, ARGH_E_NONE);
+    ASSERT_TRUE(strncmp(out_text, "# bash completion for prog", 26) == 0);
+    ASSERT_TRUE(strstr(out_text, "\ncomplete -F _prog prog\n") != NULL);
+    ASSERT_STR_EQ(err_text, "");
+}
+
+TEST(test_completions_bash_content)
+{
+    ARGV("--completions", "bash");
+    ASSERT_FALSE(sc_parse("prog", argc, argv));
+    /* Options, the negated flag, built-ins; never the hidden one */
+    ASSERT_TRUE(strstr(out_text, "\"\") echo ' --color --no-color -m --mode -o --output --level --completions -h --help ' ;;") != NULL);
+    ASSERT_TRUE(strstr(out_text, "secret") == NULL);
+    /* Values: choices, files for strings; --level=6 is optional, never the next word */
+    ASSERT_TRUE(strstr(out_text, "*\"|-m\"|*\"|--mode\") echo 'fast safe' ;;") != NULL);
+    ASSERT_TRUE(strstr(out_text, "*\"|-o\"|*\"|--output\") echo '@file' ;;") != NULL);
+    ASSERT_TRUE(strstr(out_text, "--level\") return 0") == NULL);
+    /* A positional takes file names */
+    ASSERT_TRUE(strstr(out_text, "_prog_files() {\n    case \"$1\" in\n        \"\") return 0 ;;") != NULL);
+}
+
+TEST(test_completions_fish_content)
+{
+    ARGV("--completions", "fish");
+    ASSERT_FALSE(sc_parse("my-tool", argc, argv));
+    ASSERT_TRUE(strstr(out_text, "function __my_tool_at\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "complete -c my-tool -n \"__my_tool_at ''\" -s m -l mode -d 'Don\\'t guess the mode' -x -a 'fast safe'\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "-s o -l output -d 'Output file' -r\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "-l no-color\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "-s h -l help -d 'Print help'\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "secret") == NULL);
+}
+
+TEST(test_completions_bad_shell)
+{
+    ARGV("--completions", "tcsh");
+    ASSERT_FALSE(sc_parse("prog", argc, argv));
+    ASSERT_EQ(argh_exit_code(&sc_p), 2);
+    ASSERT_STR_EQ(error_text(&sc_p), "invalid value 'tcsh' for '--completions': expected one of: bash, zsh, fish");
+}
+
+TEST(test_completions_in_help)
+{
+    ARGV("--help");
+    ASSERT_FALSE(sc_parse("prog", argc, argv));
+    ASSERT_TRUE(strstr(out_text, "      --completions <shell>") != NULL);
+    ASSERT_TRUE(strstr(out_text, "Print a completion script for bash, zsh or fish") != NULL);
+}
+
+TEST(test_print_completion)
+{
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, sc_opts);
+    ASSERT_FALSE(argh_print_completion(&p, "tcsh"));
+    ASSERT_FALSE(argh_print_completion(&p, NULL));
+    ASSERT_STR_EQ(out_text, "");
+    ASSERT_TRUE(argh_print_completion(&p, "zsh"));
+    ASSERT_TRUE(strstr(out_text, "\nautoload -U +X bashcompinit && bashcompinit\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "\ncomplete -F _prog prog\n") != NULL);
+}
+
+#ifndef ARGH_NO_COMMANDS
+TEST(test_completions_commands)
+{
+    static bool force;
+    static const char *spec;
+    static const argh_opt install_opts[] = {
+        ARGH_STRING(0, "version", &spec, "Version to install"),
+        ARGH_FLAG('f', "force", &force, "Force"),
+        ARGH_END,
+    };
+    static const argh_cmd remote_cmds[] = {ARGH_CMD("add", "Add a remote", NULL), ARGH_CMD_END};
+    static const argh_cmd cmds[] = {
+        ARGH_CMD("install", "Install", install_opts),
+        ARGH_CMD_GROUP("remote", "Remotes", remote_cmds),
+        ARGH_CMD_END,
+    };
+    ARGV("--completions", "bash");
+    argh_parser p;
+    setup(&p);
+    argh_version(&p, "1.0");
+    argh_completions(&p);
+    argh_commands(&p, cmds);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "\"\") echo 'install remote' ;;") != NULL);
+    ASSERT_TRUE(strstr(out_text, "\"remote\") echo 'add' ;;") != NULL);
+    /* install has its own --version: only -V stays built in there */
+    ASSERT_TRUE(strstr(out_text, "\"install\") echo ' --completions --version -f --force -h --help -V ' ;;") != NULL);
+    ASSERT_TRUE(strstr(out_text, "\"remote add\") echo ' --completions -h --help -V --version ' ;;") != NULL);
+    ASSERT_TRUE(strstr(out_text, "\"install|--version\") echo '@file' ;;") != NULL);
+}
+
+TEST(test_completions_fish_commands)
+{
+    static bool verify;
+    static const char *file;
+    static const argh_opt check_opts[] = {
+        ARGH_FLAG('V', "verify", &verify, "Verify"),
+        ARGH_POS("file", &file, "File"),
+        ARGH_END,
+    };
+    static const argh_cmd cmds[] = {ARGH_CMD("check", "Check a file", check_opts), ARGH_CMD("list", NULL, NULL),
+                                    ARGH_CMD_END};
+    argh_parser p;
+    setup(&p);
+    argh_version(&p, "1.0");
+    argh_commands(&p, cmds);
+
+    ASSERT_TRUE(argh_print_completion(&p, "fish"));
+    ASSERT_TRUE(strstr(out_text, "set -g __prog_cmds '|check' '|list'\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "complete -c prog -n \"__prog_at ''\" -f -a check -d 'Check a file'\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "complete -c prog -n \"__prog_at ''\" -f -a list\n") != NULL);
+    /* No positionals at the top or in list: no file names there */
+    ASSERT_TRUE(strstr(out_text, "complete -c prog -n \"__prog_at ''\" -f\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "complete -c prog -n \"__prog_at 'list'\" -f\n") != NULL);
+    ASSERT_TRUE(strstr(out_text, "complete -c prog -n \"__prog_at 'check'\" -f\n") == NULL);
+    /* check takes -V: only --version stays built in there */
+    ASSERT_TRUE(strstr(out_text, "complete -c prog -n \"__prog_at 'check'\" -l version -d 'Print version'\n") != NULL);
+
+    /* Without built-in help, no -h/--help to complete */
+    reset_output();
+    argh_set_flags(&p, ARGH_NO_AUTO_HELP);
+    ASSERT_TRUE(argh_print_completion(&p, "bash"));
+    ASSERT_TRUE(strstr(out_text, "--help") == NULL);
+}
+#endif
+#endif /* completion */
+
 /* ============================================================================ */
 
 int main(void)
@@ -3673,6 +3843,18 @@ int main(void)
     RUN_TEST(test_range_env);
     RUN_TEST(test_range_help);
     RUN_TEST(test_range_builder);
+#if !defined(ARGH_NO_STDIO) && !defined(ARGH_NO_COMPLETION)
+    RUN_TEST(test_completions_print_like_help);
+    RUN_TEST(test_completions_bash_content);
+    RUN_TEST(test_completions_fish_content);
+    RUN_TEST(test_completions_bad_shell);
+    RUN_TEST(test_completions_in_help);
+    RUN_TEST(test_print_completion);
+#ifndef ARGH_NO_COMMANDS
+    RUN_TEST(test_completions_commands);
+    RUN_TEST(test_completions_fish_commands);
+#endif
+#endif
     RUN_TEST(test_int_syntax_edges);
     RUN_TEST(test_too_many_tables);
     RUN_TEST(test_too_many_options);
