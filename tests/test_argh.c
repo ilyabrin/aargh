@@ -3204,6 +3204,247 @@ TEST(test_range_config_errors)
 }
 #endif
 
+/* ============================================================================
+ * Limits and rare paths
+ * ============================================================================ */
+
+TEST(test_int_syntax_edges)
+{
+    ASSERT_EQ(parse_int_value("0x1g"), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_int_value("-+5"), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_int_value("+-5"), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_int_value("-0x10"), ARGH_E_NONE);
+}
+
+TEST(test_too_many_tables)
+{
+    static const argh_opt empty[] = {ARGH_END};
+    ARGV0();
+    bool flag = false;
+    int i;
+    argh_parser p;
+    setup(&p);
+    for (i = 0; i < ARGH_MAX_TABLES; i++)
+        argh_table(&p, empty);
+    /* The builder needs a table slot of its own */
+    ASSERT_TRUE(argh_flag(&p, 'f', "flag", &flag, "") == NULL);
+    argh_table(&p, empty);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: more tables than ARGH_MAX_TABLES");
+}
+
+/* ARGH_MAX_OPTS + 1 flags, each with its own name and variable */
+static bool lim_flags[ARGH_MAX_OPTS + 1];
+static char lim_names[ARGH_MAX_OPTS + 1][8];
+static argh_opt lim_opts[ARGH_MAX_OPTS + 2];
+
+static const argh_opt *lim_table(void)
+{
+    static const argh_opt end = ARGH_END;
+    int i;
+    for (i = 0; i <= ARGH_MAX_OPTS; i++)
+    {
+        argh_opt o = ARGH_FLAG(0, NULL, NULL, "");
+        snprintf(lim_names[i], sizeof(lim_names[i]), "f%d", i);
+        o.long_name = lim_names[i];
+        o.target = &lim_flags[i];
+        lim_opts[i] = o;
+    }
+    lim_opts[ARGH_MAX_OPTS + 1] = end;
+    return lim_opts;
+}
+
+TEST(test_too_many_options)
+{
+    ARGV0();
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, lim_table());
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: more options than ARGH_MAX_OPTS");
+}
+
+TEST(test_enum_without_choices)
+{
+    static int mode;
+    static const argh_opt opts[] = {ARGH_ENUM('m', "mode", &mode, NULL, "Mode"), ARGH_END};
+    ARGV0();
+    argh_parser p;
+    setup(&p);
+    argh_table(&p, opts);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: enum option has no choices (--mode)");
+}
+
+TEST(test_no_suggestion_for_long_names)
+{
+    ARGV("--a-very-long-option-name-that-is-longer-than-anything-a-suggestion-would-compare");
+    bool flag = false;
+    argh_parser p;
+    setup(&p);
+    argh_flag(&p, 0, "a-very-long-option", &flag, "");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(error_text(&p), "did you mean") == NULL);
+}
+
+TEST(test_group_builder)
+{
+    ARGV("--help");
+    bool a = false, b = false;
+    argh_parser p;
+    setup(&p);
+    argh_flag(&p, 'a', "alpha", &a, "Alpha");
+    argh_group(&p, "Advanced");
+    argh_flag(&p, 'b', "beta", &b, "Beta");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "\nAdvanced:\n  -b, --beta") != NULL);
+}
+
+TEST(test_format_error_without_error)
+{
+    ARGV0();
+    char buf[16] = "x";
+    argh_parser p;
+    setup(&p);
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_format_error(&p, buf, sizeof(buf)), 0);
+    ASSERT_STR_EQ(buf, "");
+}
+
+#ifndef ARGH_NO_COMMANDS
+/* ARGH_MAX_DEPTH + 1 levels: a b c d e */
+static const argh_cmd deep5[] = {ARGH_CMD("e", "E", NULL), ARGH_CMD_END};
+static const argh_cmd deep4[] = {ARGH_CMD_GROUP("d", "D", deep5), ARGH_CMD_END};
+static const argh_cmd deep3[] = {ARGH_CMD_GROUP("c", "C", deep4), ARGH_CMD_END};
+static const argh_cmd deep2[] = {ARGH_CMD_GROUP("b", "B", deep3), ARGH_CMD_END};
+static const argh_cmd deep1[] = {ARGH_CMD_GROUP("a", "A", deep2), ARGH_CMD_END};
+
+TEST(test_commands_too_deep)
+{
+    ARGV("a", "b", "c", "d", "e");
+    argh_parser p;
+    setup(&p);
+    argh_commands(&p, deep1);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: commands nested deeper than ARGH_MAX_DEPTH");
+}
+
+#ifdef NDEBUG
+/* Without the definition check, the limit holds where the path is walked */
+TEST(test_help_path_too_deep)
+{
+    ARGV("help", "a", "b", "c", "d", "e");
+    argh_parser p;
+    setup(&p);
+    argh_commands(&p, deep1);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: commands nested deeper than ARGH_MAX_DEPTH");
+}
+#endif
+
+TEST(test_help_command_extra_word)
+{
+    static const argh_cmd cmds[] = {ARGH_CMD("build", "Build", NULL), ARGH_CMD_END};
+    ARGV("help", "build", "now");
+    argh_parser p;
+    setup(&p);
+    argh_commands(&p, cmds);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "unexpected argument 'now'");
+}
+
+TEST(test_too_many_options_on_command_path)
+{
+    static const argh_cmd cmds[] = {ARGH_CMD("run", "Run", lim_opts), ARGH_CMD_END};
+    ARGV("run");
+    argh_parser p;
+    lim_table();
+    setup(&p);
+    argh_commands(&p, cmds);
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: more options than ARGH_MAX_OPTS on this command path");
+}
+
+/* A command that takes over -V or --version: help lists only the free form */
+TEST(test_help_version_partly_taken)
+{
+    static bool v;
+    static const argh_opt long_taken[] = {ARGH_FLAG(0, "version", &v, "Show the package version"), ARGH_END};
+    static const argh_opt short_taken[] = {ARGH_FLAG('V', "verify", &v, "Verify"), ARGH_END};
+    static const argh_cmd cmds[] = {ARGH_CMD("install", "Install", long_taken), ARGH_CMD("check", "Check", short_taken),
+                                    ARGH_CMD_END};
+    argh_parser p;
+    {
+        ARGV("install", "--help");
+        setup(&p);
+        argh_version(&p, "1.0");
+        argh_commands(&p, cmds);
+        ASSERT_FALSE(argh_parse(&p, argc, argv));
+        ASSERT_TRUE(strstr(out_text, "-V  ") != NULL || strstr(out_text, "  -V ") != NULL);
+        ASSERT_TRUE(strstr(out_text, "Print version") != NULL);
+        ASSERT_TRUE(strstr(out_text, "--version  Print version") == NULL);
+    }
+    {
+        ARGV("check", "--help");
+        reset_output();
+        setup(&p);
+        argh_version(&p, "1.0");
+        argh_commands(&p, cmds);
+        ASSERT_FALSE(argh_parse(&p, argc, argv));
+        ASSERT_TRUE(strstr(out_text, "    --version") != NULL);
+        ASSERT_TRUE(strstr(out_text, "-V, --version") == NULL);
+    }
+}
+
+#ifndef NDEBUG
+TEST(test_command_config_twice_and_positionals)
+{
+    static const char *file;
+    static const argh_opt with_pos[] = {ARGH_POS("file", &file, "File"), ARGH_END};
+    static const argh_cmd subs[] = {ARGH_CMD("x", "X", NULL), ARGH_CMD_END};
+    static const argh_cmd twice[] = {ARGH_CMD("run", "Run", NULL), ARGH_CMD("run", "Again", NULL), ARGH_CMD_END};
+    static const argh_cmd mixed[] = {{"group", "Group", with_pos, subs, NULL, 0}, ARGH_CMD_END};
+    ARGV0();
+    argh_parser p;
+
+    setup(&p);
+    argh_commands(&p, twice);
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: command defined twice");
+
+    setup(&p);
+    argh_commands(&p, mixed);
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: a command with subcommands cannot have positional arguments");
+}
+#endif
+#endif
+
+#ifndef NDEBUG
+TEST(test_example_too_long)
+{
+    char words[ARGH__EXAMPLE_WORDS * 3 + 8] = "prog";
+    int i;
+    argh_parser p;
+    for (i = 0; i < ARGH__EXAMPLE_WORDS; i++)
+        strcat(words, " a");
+    /* 33 words with the program name: one more than an example may have */
+    setup(&p);
+    ASSERT_TRUE(strstr(example_error(&p, words), "an example needs at most 256 characters, 32 words") != NULL);
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_CONFIG);
+}
+#endif
+
 /* ============================================================================ */
 
 int main(void)
@@ -3431,6 +3672,28 @@ int main(void)
     RUN_TEST(test_range_env);
     RUN_TEST(test_range_help);
     RUN_TEST(test_range_builder);
+    RUN_TEST(test_int_syntax_edges);
+    RUN_TEST(test_too_many_tables);
+    RUN_TEST(test_too_many_options);
+    RUN_TEST(test_enum_without_choices);
+    RUN_TEST(test_no_suggestion_for_long_names);
+    RUN_TEST(test_group_builder);
+    RUN_TEST(test_format_error_without_error);
+#ifndef ARGH_NO_COMMANDS
+    RUN_TEST(test_commands_too_deep);
+#ifdef NDEBUG
+    RUN_TEST(test_help_path_too_deep);
+#endif
+    RUN_TEST(test_help_command_extra_word);
+    RUN_TEST(test_too_many_options_on_command_path);
+    RUN_TEST(test_help_version_partly_taken);
+#ifndef NDEBUG
+    RUN_TEST(test_command_config_twice_and_positionals);
+#endif
+#endif
+#ifndef NDEBUG
+    RUN_TEST(test_example_too_long);
+#endif
 #ifndef NDEBUG
     RUN_TEST(test_range_config_errors);
 #endif

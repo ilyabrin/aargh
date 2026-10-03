@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Changed
+
+- Parsing runs about 9% fewer instructions (callgrind): long names are compared in place instead of with `strncmp`, and the per-parse definition checks pass the usual option on a few compares. On the ARM64 CI runner with GCC the gap to `getopt_long` shrank from 13% toward parity.
+- Tests cover 99% of the lines in argh.h, and CI fails if that drops below 98% (`make coverage`).
+
 ## [1.6.0] - 2026-10-03
 
 ### Added
