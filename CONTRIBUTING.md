@@ -21,6 +21,7 @@ You need a C99 compiler and `make`. That's it.
 make test     # build and run the test suite
 make smoke    # run the examples and check their output
 make cxx      # check that argh.h compiles as C++
+make coverage # lines of argh.h the tests run; lists the ones they miss
 make bench    # run benchmarks (speed and code size)
 make clean
 ```

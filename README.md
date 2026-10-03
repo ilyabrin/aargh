@@ -646,7 +646,7 @@ argh_set_writer(&p, uart_write, NULL);
 ```
 
 - **`ARGH_NO_STDIO`** keeps stdio out of your firmware. Output goes only to your writer; without one it is discarded. Help, errors and defaults in help work the same.
-- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.5 to 9.9 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
+- **`ARGH_NO_FLOAT`** matters more than it looks: the C library's `strtod` pulls in a large float parser, and on newlib also printf, about 27 KB on a Cortex-M0. Without it argh adds about 11 KB of flash, or 9.4 to 9.8 KB with `ARGH_NO_COMMANDS`, `ARGH_NO_SUGGEST` and `ARGH_HELP_WIDTH=0` (see [BENCHMARKS.md](BENCHMARKS.md#microcontrollers)). If you need fractions, a [custom type](#your-own-value-types) that parses fixed-point values costs far less.
 - **RAM:** the parser lives on the stack or wherever you put it. On a 32-bit MCU it is 136 bytes plus 28 bytes for each of the `ARGH_BUILDER_CAP` + 1 builder slots: 1,060 bytes by default. Set `ARGH_BUILDER_CAP` to what you use, or to 0 with `static const` tables, which stay in flash: then it is 164 bytes.
 
 With `ARGH_NO_STDIO` alone, doubles in help are shown with up to 6 decimals, and very large or very small ones are left out.
@@ -787,7 +787,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.6.0" */
+ARGH_VERSION          /* "1.7.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -901,21 +901,21 @@ Three complete programs in [examples/](examples), each a real kind of tool:
 
 ## Known limitations
 
-- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.5 to 11.7 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
+- **Help and error text cannot be removed.** On a microcontroller argh adds about 9.4 to 11.8 KB of flash, strings included (see [Microcontrollers](#microcontrollers)).
 - Floating-point values follow the C locale's decimal separator, like `strtod`.
 
 ## Benchmarks
 
-Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.6 on CI. Each row comes from one machine; compare within a row:
+Time to set up a parser with 30 options and parse 17 arguments, release builds (`-O2 -DNDEBUG`), v1.7 on CI. Each row comes from one machine; compare within a row:
 
 | Platform           | argh (table) | argh (builder) | getopt_long |
 | ------------------ | -----------: | -------------: | ----------: |
-| macOS, Clang       |       397 ns |         434 ns |      474 ns |
-| Linux, Clang       |       543 ns |         611 ns |      631 ns |
-| Linux, GCC         |       535 ns |         657 ns |      565 ns |
-| Linux ARM64, Clang |       469 ns |         539 ns |      453 ns |
-| Linux ARM64, GCC   |       495 ns |         587 ns |      437 ns |
-| Windows, MinGW GCC |       907 ns |         984 ns |      887 ns |
+| macOS, Clang       |       506 ns |         594 ns |      673 ns |
+| Linux, Clang       |       375 ns |         409 ns |      466 ns |
+| Linux, GCC         |       575 ns |         649 ns |      625 ns |
+| Linux ARM64, Clang |       433 ns |         493 ns |      451 ns |
+| Linux ARM64, GCC   |       455 ns |         540 ns |      436 ns |
+| Windows, MinGW GCC |       887 ns |         945 ns |      894 ns |
 
 argh makes zero heap allocations. Details, memory, code size and the method: [BENCHMARKS.md](BENCHMARKS.md). Run them with `make bench`.
 
@@ -930,9 +930,10 @@ make cxx        # check that argh.h compiles as C++
 make fuzz       # fuzz the parser with libFuzzer (needs clang), 60 s by default
 make size-arm   # flash added to ARM firmware, checked against budgets
 make docs-check # README examples and llms.txt match the code (Python 3)
+make coverage   # lines of argh.h the tests run, at least 98% (gcc, gcov)
 ```
 
-CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
+CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, the coverage minimum and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
 
 ## Contributing
 
