@@ -1,5 +1,5 @@
 /*
- * argh.h - v1.11.0 - Single-header command-line argument parser for C
+ * argh.h - v1.12.0 - Single-header command-line argument parser for C
  *
  * The API follows Semantic Versioning: no breaking changes before v2.0.
  *
@@ -57,9 +57,9 @@
  *     #error "needs argh.h 1.0 or later"
  *     #endif */
 #define ARGH_VERSION_MAJOR 1
-#define ARGH_VERSION_MINOR 11
+#define ARGH_VERSION_MINOR 12
 #define ARGH_VERSION_PATCH 0
-#define ARGH_VERSION "1.11.0"
+#define ARGH_VERSION "1.12.0"
 
 /* ARGH_STATIC: every function is static and the implementation is included,
  * for a program in one file or a library that embeds its own copy of argh.h
