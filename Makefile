@@ -34,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check c23 thread-check fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check c23 thread-check mutation fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -115,6 +115,11 @@ c23:
 	$(MAKE) test CFLAGS="-std=c2x -Wall -Wextra -Wpedantic -Werror -O2"
 	! $(CC) -std=c2x -Werror -o nodiscard_check$(EXE) tests/nodiscard_check.c 2>/dev/null
 	@echo "C23: dropped results are caught"
+
+# Mutation testing with Mull: do the tests notice small changes to argh.h?
+# Needs clang; downloads Mull on first use (Ubuntu 24.04)
+mutation:
+	sh tests/mutation.sh
 
 # Many threads parsing at once, under ThreadSanitizer (clang or gcc, POSIX)
 thread-check:

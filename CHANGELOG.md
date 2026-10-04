@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Mutation testing with Mull in CI (`make mutation`): every pull request checks that the tests notice small changes to argh.h. It started at 86% of 1,434 changes caught; new tests for flag words (`on`, `off`, `yes`, `no`), `argh_given` on positionals and environment counters, range edges and `--version` after an error bring it to 87%.
 - Continuous fuzzing with ClusterFuzzLite: 5 minutes per sanitizer (address, undefined, memory) on every pull request that touches the parser, and an hour each every night. The fuzz target gets a dictionary of its options and commands (`tests/fuzz_argh.dict`), which `make fuzz` uses too.
 
 ## [1.11.0] - 2026-10-04
