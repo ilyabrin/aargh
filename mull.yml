@@ -1,0 +1,7 @@
+# Mutation testing with Mull (`make mutation`): which code gets mutated and how.
+# Only argh.h is mutated; the tests are what is being judged.
+mutators:
+  - cxx_all
+includePaths:
+  - '.*argh\.h'
+timeout: 10000

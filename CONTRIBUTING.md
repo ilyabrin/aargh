@@ -26,6 +26,7 @@ make package-check # use argh through CMake, pkg-config, Conan and Meson
 make completion-check # load the completion scripts in bash, zsh and fish
 make c23      # build the tests as C23 (argh itself stays C99)
 make thread-check # many threads parsing at once, under ThreadSanitizer
+make mutation # mutation testing: lists changes to argh.h that no test notices
 make bench    # run benchmarks (speed and code size)
 make clean
 ```
@@ -39,6 +40,8 @@ make CC=clang test CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g -fsa
 ```
 
 For parsing changes, also fuzz for a few minutes: `make fuzz FUZZ_TIME=300` (needs clang with libFuzzer, for example on Linux or WSL). If it finds a crash, it saves the input as `crash-*`; add that file to [tests/fuzz](tests/fuzz) so `make test` replays it from then on. ClusterFuzzLite also fuzzes every pull request that touches argh.h (5 minutes per sanitizer) and runs an hour per sanitizer every night ([.clusterfuzzlite](.clusterfuzzlite)); a crash there attaches the input to the run, which goes to tests/fuzz the same way. New options or commands in the fuzz target belong in [tests/fuzz_argh.dict](tests/fuzz_argh.dict) too.
+
+CI also runs mutation testing (`make mutation`, [Mull](https://github.com/mull-project/mull)): it changes argh.h in small ways, one at a time, and runs the tests on each change. It lists the changes no test noticed as `argh.h:LINE: Replaced < with <=` and fails if the share caught drops below the minimum in [tests/mutation.sh](tests/mutation.sh). New code should come with tests that notice such changes; raise the minimum when they do.
 
 ## What a good pull request looks like
 

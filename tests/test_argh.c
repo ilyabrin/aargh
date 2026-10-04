@@ -3616,6 +3616,166 @@ TEST(test_completions_fish_commands)
 #endif
 #endif /* completion */
 
+/* ============================================================================
+ * Gaps found by mutation testing (make mutation)
+ * ============================================================================ */
+
+static int flag_value(const char *text)
+{
+    char arg[64];
+    char *argv[] = {(char *)"prog", arg, NULL};
+    bool flag = false;
+    argh_parser p;
+    snprintf(arg, sizeof(arg), "--flag=%s", text);
+    setup(&p);
+    argh_flag(&p, 0, "flag", &flag, "");
+    if (!argh_parse(&p, 2, argv))
+        return -1;
+    return flag;
+}
+
+TEST(test_flag_value_words)
+{
+    ASSERT_EQ(flag_value("true"), 1);
+    ASSERT_EQ(flag_value("yes"), 1);
+    ASSERT_EQ(flag_value("on"), 1);
+    ASSERT_EQ(flag_value("1"), 1);
+    ASSERT_EQ(flag_value("TRUE"), 1);
+    ASSERT_EQ(flag_value("On"), 1);
+    ASSERT_EQ(flag_value("false"), 0);
+    ASSERT_EQ(flag_value("no"), 0);
+    ASSERT_EQ(flag_value("off"), 0);
+    ASSERT_EQ(flag_value("0"), 0);
+    ASSERT_EQ(flag_value("NO"), 0);
+    ASSERT_EQ(flag_value("Off"), 0);
+    ASSERT_EQ(flag_value("maybe"), -1);
+    ASSERT_EQ(flag_value("tru"), -1);
+    ASSERT_EQ(flag_value("2"), -1);
+    ASSERT_EQ(flag_value(""), -1);
+}
+
+TEST(test_given_positionals)
+{
+    ARGV("in.txt", "a", "b");
+    const char *input = NULL, *missing = NULL;
+    argh_values rest = {0};
+    argh_parser p;
+    setup(&p);
+    argh_pos(&p, "input", &input, "");
+    argh_rest(&p, "files", &rest, "");
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(argh_given(&p, &input));
+    ASSERT_TRUE(argh_given(&p, &rest));
+
+    {
+        ARGV("in.txt");
+        argh_parser q;
+        setup(&q);
+        argh_pos(&q, "input", &input, "");
+        argh_optional(argh_pos(&q, "extra", &missing, ""));
+        argh_rest(&q, "files", &rest, "");
+        ASSERT_TRUE(argh_parse(&q, argc, argv));
+        ASSERT_TRUE(argh_given(&q, &input));
+        ASSERT_FALSE(argh_given(&q, &missing));
+        ASSERT_FALSE(argh_given(&q, &rest));
+        ASSERT_EQ(rest.count, 0);
+    }
+}
+
+TEST(test_given_counter_from_env)
+{
+    ARGV0();
+    int debug = 0;
+    argh_parser p;
+    reset_output();
+    setup(&p);
+    argh_count(&p, 'd', "debug", &debug, "");
+    argh_env(&p, &debug, "TOOL_DEBUG");
+    set_env("TOOL_DEBUG", "2");
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(debug, 2);
+    ASSERT_TRUE(argh_given(&p, &debug));
+}
+
+TEST(test_counter_stops_at_int_max)
+{
+    ARGV("-vvv");
+    int level = INT_MAX - 1;
+    argh_parser p;
+    setup(&p);
+    argh_count(&p, 'v', "verbose", &level, "");
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(level, INT_MAX);
+}
+
+TEST(test_range_edges)
+{
+    ARGV("--one", "5", "--level", "1", "--size", "0");
+    int one = 0;
+    unsigned level = 3;
+    size_t size = 9;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 0, "one", &one, "");
+    argh_range(&p, &one, 5, 5); /* a single value is a valid range */
+    argh_uint(&p, 0, "level", &level, "");
+    argh_range(&p, &level, 1, 9);
+    argh_size(&p, 0, "size", &size, "");
+    argh_range(&p, &size, 0, 100);
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(one, 5);
+    ASSERT_EQ(level, 1);
+    ASSERT_TRUE(size == 0);
+}
+
+#ifndef NDEBUG
+TEST(test_range_bounds_fit_the_type)
+{
+    static int n;
+    static unsigned u;
+    static const argh_opt int_max[] = {ARGH_INT(0, "n", &n, ""), ARGH_RANGE(&n, 0, INT_MAX), ARGH_END};
+    static const argh_opt uint_max[] = {ARGH_UINT(0, "u", &u, ""), ARGH_RANGE(&u, 0, (long)(UINT_MAX > LONG_MAX ? LONG_MAX : UINT_MAX)), ARGH_END};
+    const char *text;
+
+    ASSERT_EQ(implicit_config(int_max, &text), ARGH_E_NONE);
+    ASSERT_EQ(implicit_config(uint_max, &text), ARGH_E_NONE);
+#if LONG_MAX > INT_MAX
+    {
+        static const argh_opt past_int[] = {ARGH_INT(0, "n", &n, ""), ARGH_RANGE(&n, 0, (long)INT_MAX + 1), ARGH_END};
+        static const argh_opt below_int[] = {ARGH_INT(0, "n", &n, ""), ARGH_RANGE(&n, (long)INT_MIN - 1, 0), ARGH_END};
+        static const argh_opt past_uint[] = {ARGH_UINT(0, "u", &u, ""), ARGH_RANGE(&u, 0, (long)UINT_MAX + 1), ARGH_END};
+        ASSERT_EQ(implicit_config(past_int, &text), ARGH_E_CONFIG);
+        ASSERT_EQ(implicit_config(below_int, &text), ARGH_E_CONFIG);
+        ASSERT_EQ(implicit_config(past_uint, &text), ARGH_E_CONFIG);
+    }
+#endif
+}
+#endif
+
+TEST(test_version_after_an_error)
+{
+    argh_parser p;
+    {
+        ARGV("--jbos", "--version");
+        setup(&p);
+        argh_version(&p, "2.0");
+        ASSERT_FALSE(argh_parse(&p, argc, argv));
+        ASSERT_EQ(argh_exit_code(&p), 0);
+        ASSERT_STR_EQ(out_text, "prog 2.0\n");
+    }
+    {
+        ARGV("--jbos", "-qV");
+        bool quiet = false;
+        reset_output();
+        setup(&p);
+        argh_version(&p, "2.0");
+        argh_flag(&p, 'q', "quiet", &quiet, "");
+        ASSERT_FALSE(argh_parse(&p, argc, argv));
+        ASSERT_EQ(argh_exit_code(&p), 0);
+        ASSERT_STR_EQ(out_text, "prog 2.0\n");
+    }
+}
+
 /* ============================================================================ */
 
 int main(void)
@@ -3843,6 +4003,15 @@ int main(void)
     RUN_TEST(test_range_env);
     RUN_TEST(test_range_help);
     RUN_TEST(test_range_builder);
+    RUN_TEST(test_flag_value_words);
+    RUN_TEST(test_given_positionals);
+    RUN_TEST(test_given_counter_from_env);
+    RUN_TEST(test_counter_stops_at_int_max);
+    RUN_TEST(test_range_edges);
+#ifndef NDEBUG
+    RUN_TEST(test_range_bounds_fit_the_type);
+#endif
+    RUN_TEST(test_version_after_an_error);
 #if !defined(ARGH_NO_STDIO) && !defined(ARGH_NO_COMPLETION)
     RUN_TEST(test_completions_print_like_help);
     RUN_TEST(test_completions_bash_content);

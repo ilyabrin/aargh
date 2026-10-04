@@ -1046,11 +1046,12 @@ make package-check # CMake, pkg-config, Conan and Meson builds of a program that
 make completion-check # the completion scripts in bash, zsh and fish
 make c23        # the tests as C23, and [[nodiscard]] at work
 make thread-check # 8 threads parsing at once, under ThreadSanitizer
+make mutation   # do the tests notice small changes to argh.h? (Mull, clang)
 ```
 
 With CMake instead of make, on any platform: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 
-CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer, 2 minutes of fuzzing, 5 more per sanitizer (address, undefined, memory) with [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/) on changes to the parser and an hour each every night, the coverage minimum, every way of installing argh, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
+CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer, mutation testing, 2 minutes of fuzzing, 5 more per sanitizer (address, undefined, memory) with [ClusterFuzzLite](https://google.github.io/clusterfuzzlite/) on changes to the parser and an hour each every night, the coverage minimum, every way of installing argh, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
 
 ## Contributing
 
