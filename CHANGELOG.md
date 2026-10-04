@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+
+- With C23 or C++17, ignoring the result of `argh_parse`, `argh_exit_code`, `argh_given`, `argh_command` or `argh_last_error` is a warning (`[[nodiscard]]`); `(void)` silences it. C99 to C17 and older C++ see no change. argh still needs only C99.
+- CI builds the tests as C23 with GCC and Clang on Linux and macOS (`make c23`), and checks that a dropped `argh_parse` result is caught there.
+
 ## [1.10.0] - 2026-10-04
 
 ### Added

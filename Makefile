@@ -34,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check c23 fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -108,6 +108,14 @@ package-check:
 completion-check:
 	sh tests/completion/check.sh
 
+# C23: the tests build cleanly, and dropping argh_parse's result is an error
+# with -Werror there ([[nodiscard]]); POSIX shell
+c23:
+	$(MAKE) clean
+	$(MAKE) test CFLAGS="-std=c2x -Wall -Wextra -Wpedantic -Werror -O2"
+	! $(CC) -std=c2x -Werror -o nodiscard_check$(EXE) tests/nodiscard_check.c 2>/dev/null
+	@echo "C23: dropped results are caught"
+
 size-arm:
 	sh bench/size_arm.sh
 
@@ -115,4 +123,4 @@ cxx: tests/cxx_check.cpp argh.h
 	$(CXX) -std=c++11 -Wall -Wextra -Wpedantic -Werror -o cxx_check$(EXE) tests/cxx_check.cpp
 
 clean:
-	-$(RM) $(call fixpath,test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) static_check$(EXE) bench_parse$(EXE) cxx_check$(EXE) $(EXAMPLES))
+	-$(RM) $(call fixpath,test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) static_check$(EXE) nodiscard_check$(EXE) bench_parse$(EXE) cxx_check$(EXE) $(EXAMPLES))
