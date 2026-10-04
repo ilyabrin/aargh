@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 | `argh_int`    | `ARGH_INT`    | `int`          |
 | `argh_long`   | `ARGH_LONG`   | `long`         |
 | `argh_uint`   | `ARGH_UINT`   | `unsigned`     |
-| `argh_size`   | `ARGH_SIZE`   | `size_t`       |
+| `argh_size`   | `ARGH_SIZE`   | `size_t`, takes `64K`, `4M`, `1G`, `2T`, `4MiB` (x1024) |
 | `argh_double` | `ARGH_DOUBLE` | `double`       |
 | `argh_string` | `ARGH_STRING` | `const char *` |
 | `argh_enum`   | `ARGH_ENUM`   | `int` (index)  |

@@ -442,7 +442,76 @@ TEST(test_uint_error_message)
     argh_size(&p, 0, "size", &size, "");
 
     ASSERT_FALSE(argh_parse(&p, argc, argv));
-    ASSERT_STR_EQ(error_text(&p), "invalid value '-5' for '--size': expected a non-negative integer");
+    ASSERT_STR_EQ(error_text(&p), "invalid value '-5' for '--size': expected a size such as 512, 64K or 4M");
+}
+
+static size_t size_value(const char *text)
+{
+    char *argv[] = {(char *)"prog", (char *)"-n", (char *)text, NULL};
+    size_t z = 7;
+    argh_parser p;
+    setup(&p);
+    argh_size(&p, 'n', "num", &z, "");
+    return argh_parse(&p, 3, argv) ? z : (size_t)-1;
+}
+
+TEST(test_size_suffixes)
+{
+    ASSERT_TRUE(size_value("512") == 512);
+    ASSERT_TRUE(size_value("64K") == 65536);
+    ASSERT_TRUE(size_value("64k") == 65536);
+    ASSERT_TRUE(size_value("4M") == 4194304);
+    ASSERT_TRUE(size_value("4MiB") == 4194304);
+    ASSERT_TRUE(size_value("1G") == 1073741824);
+    ASSERT_TRUE(size_value("0K") == 0);
+    ASSERT_TRUE(size_value("0x10K") == 16384);
+#if SIZE_MAX == 18446744073709551615U
+    ASSERT_TRUE(size_value("2T") == (size_t)2 << 40);
+    ASSERT_TRUE(size_value("16777215T") == (size_t)16777215 << 40);
+    ASSERT_EQ(parse_uint_value("16777216T", true), ARGH_E_OUT_OF_RANGE);
+#elif SIZE_MAX == 4294967295U
+    ASSERT_TRUE(size_value("3G") == (size_t)3 << 30);
+    ASSERT_EQ(parse_uint_value("4G", true), ARGH_E_OUT_OF_RANGE);
+    ASSERT_EQ(parse_uint_value("1T", true), ARGH_E_OUT_OF_RANGE);
+#endif
+    ASSERT_EQ(parse_uint_value("99999999999999999999K", true), ARGH_E_OUT_OF_RANGE);
+}
+
+TEST(test_size_suffix_rejects_bad_input)
+{
+    ASSERT_EQ(parse_uint_value("K", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("iB", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("KiB", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("4iB", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("4KB", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("4kib", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("4X", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("4 K", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("4KK", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("-1K", true), ARGH_E_INVALID_VALUE);
+    ASSERT_EQ(parse_uint_value("0xK", true), ARGH_E_INVALID_VALUE);
+    /* Only sizes take units */
+    ASSERT_EQ(parse_uint_value("4K", false), ARGH_E_INVALID_VALUE);
+}
+
+TEST(test_size_suffix_range)
+{
+    char *argv[] = {(char *)"prog", (char *)"--buf", (char *)"2M", NULL};
+    size_t buf = 0;
+    argh_parser p;
+    setup(&p);
+    argh_size(&p, 0, "buf", &buf, "");
+    argh_range(&p, &buf, 4096, 1048576);
+
+    /* The range applies to the bytes, not to the number before the unit */
+    ASSERT_FALSE(argh_parse(&p, 3, argv));
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_OUT_OF_RANGE);
+    argv[2] = (char *)"1M";
+    setup(&p);
+    argh_size(&p, 0, "buf", &buf, "");
+    argh_range(&p, &buf, 4096, 1048576);
+    ASSERT_TRUE(argh_parse(&p, 3, argv));
+    ASSERT_TRUE(buf == 1048576);
 }
 
 static unsigned ut_retries = 3;
@@ -485,7 +554,7 @@ TEST(test_uint_from_env)
     set_env("TOOL_LIMIT", "-1");
     ASSERT_FALSE(argh_parse(&p, argc, argv));
     ASSERT_STR_EQ(error_text(&p),
-                  "invalid value '-1' in TOOL_LIMIT for '--limit': expected a non-negative integer");
+                  "invalid value '-1' in TOOL_LIMIT for '--limit': expected a size such as 512, 64K or 4M");
 }
 
 #ifndef ARGH_NO_FLOAT
@@ -4093,6 +4162,9 @@ int main(void)
     RUN_TEST(test_uint_and_size);
     RUN_TEST(test_uint_rejects_bad_input);
     RUN_TEST(test_uint_error_message);
+    RUN_TEST(test_size_suffixes);
+    RUN_TEST(test_size_suffix_rejects_bad_input);
+    RUN_TEST(test_size_suffix_range);
     RUN_TEST(test_uint_table_help);
     RUN_TEST(test_uint_from_env);
 #ifndef ARGH_NO_FLOAT
