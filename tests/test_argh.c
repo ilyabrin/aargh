@@ -3614,6 +3614,62 @@ TEST(test_completions_fish_commands)
     ASSERT_TRUE(strstr(out_text, "--help") == NULL);
 }
 #endif
+
+/* The whole script, byte for byte, against tests/completion/expected/gt.*.
+ * After an intended change to the scripts, regenerate those files and review
+ * the diff. The tests run from the repository root. */
+#ifndef ARGH_NO_COMMANDS
+static const char *const gt_when[] = {"auto", "never", NULL};
+static bool gt_color, gt_force;
+static int gt_mode;
+static const char *gt_out, *gt_file;
+static const argh_opt gt_top[] = {
+    ARGH_FLAG(0, "color", &gt_color, "Use color", ARGH_NEGATABLE),
+    ARGH_ENUM('w', "when", &gt_mode, gt_when, "When it's done"),
+    ARGH_STRING('o', NULL, &gt_out, "Output"),
+    ARGH_END,
+};
+static const argh_opt gt_add[] = {
+    ARGH_FLAG('f', "force", &gt_force, "Force"),
+    ARGH_POS("file", &gt_file, "File"),
+    ARGH_END,
+};
+static const argh_cmd gt_remote[] = {ARGH_CMD("add", "Add one", gt_add), ARGH_CMD_END};
+static const argh_cmd gt_cmds[] = {ARGH_CMD_GROUP("remote", "Remotes", gt_remote), ARGH_CMD_END};
+
+static bool matches_file(const char *path, const char *text)
+{
+    static char expected[8192];
+    size_t n;
+    FILE *f = fopen(path, "rb");
+    if (!f)
+    {
+        printf("  cannot open %s: run the tests from the repository root\n", path);
+        return false;
+    }
+    n = fread(expected, 1, sizeof(expected) - 1, f);
+    fclose(f);
+    expected[n] = '\0';
+    return strcmp(expected, text) == 0;
+}
+
+TEST(test_completion_scripts_match_expected)
+{
+    argh_parser p;
+    reset_output();
+    argh_init(&p, "gt", NULL);
+    argh_set_writer(&p, capture, NULL);
+    argh_version(&p, "1.0");
+    argh_table(&p, gt_top);
+    argh_commands(&p, gt_cmds);
+
+    ASSERT_TRUE(argh_print_completion(&p, "bash"));
+    ASSERT_TRUE(matches_file("tests/completion/expected/gt.bash", out_text));
+    reset_output();
+    ASSERT_TRUE(argh_print_completion(&p, "fish"));
+    ASSERT_TRUE(matches_file("tests/completion/expected/gt.fish", out_text));
+}
+#endif
 #endif /* completion */
 
 /* ============================================================================
@@ -3775,6 +3831,243 @@ TEST(test_version_after_an_error)
         ASSERT_STR_EQ(out_text, "prog 2.0\n");
     }
 }
+
+/* Every usage error exits with 2, whatever the kind */
+static int exit_code_of(int argc, char **argv)
+{
+    int jobs = 0;
+    bool verbose = false;
+    const char *out = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "");
+    argh_flag(&p, 'v', "verbose", &verbose, "");
+    argh_string(&p, 'o', "output", &out, "");
+    if (argh_parse(&p, argc, argv))
+        return 0;
+    return argh_exit_code(&p);
+}
+
+TEST(test_every_error_exits_2)
+{
+    char *missing_long[] = {(char *)"prog", (char *)"--jobs", NULL};
+    char *missing_short[] = {(char *)"prog", (char *)"-j", NULL};
+    char *unexpected[] = {(char *)"prog", (char *)"--verbose=x=y", NULL};
+    char *flag_value[] = {(char *)"prog", (char *)"--no-verbose=1", NULL};
+    char *short_eq[] = {(char *)"prog", (char *)"-v=1", NULL};
+    char *short_eq_value[] = {(char *)"prog", (char *)"-j=1", NULL};
+    char *unknown_short[] = {(char *)"prog", (char *)"-vx", NULL};
+    char *unknown_long[] = {(char *)"prog", (char *)"--nope", NULL};
+    char *extra[] = {(char *)"prog", (char *)"file", NULL};
+    ASSERT_EQ(exit_code_of(2, missing_long), 2);
+    ASSERT_EQ(exit_code_of(2, missing_short), 2);
+    ASSERT_EQ(exit_code_of(2, flag_value), 2);
+    ASSERT_EQ(exit_code_of(2, short_eq), 2);
+    ASSERT_EQ(exit_code_of(2, short_eq_value), 2);
+    ASSERT_EQ(exit_code_of(2, unknown_short), 2);
+    ASSERT_EQ(exit_code_of(2, unknown_long), 2);
+    ASSERT_EQ(exit_code_of(2, extra), 2);
+    (void)unexpected;
+}
+
+/* Only argv[0] .. argv[argc - 1] count, even when the array goes on */
+TEST(test_argc_is_the_limit)
+{
+    char *value_past_argc[] = {(char *)"prog", (char *)"-o", (char *)"x", NULL};
+    char *long_past_argc[] = {(char *)"prog", (char *)"--output", (char *)"x", NULL};
+    char *arg_past_argc[] = {(char *)"prog", (char *)"-v", (char *)"--nope", NULL};
+    char *help_past_argc[] = {(char *)"prog", (char *)"--nope", (char *)"--help", NULL};
+    const char *out = NULL;
+    bool verbose = false;
+    argh_parser p;
+
+    ASSERT_EQ(exit_code_of(2, value_past_argc), 2);
+    ASSERT_EQ(exit_code_of(2, long_past_argc), 2);
+    ASSERT_EQ(exit_code_of(2, arg_past_argc), 0);
+    /* --help beyond argc is not seen: the error before it stands */
+    ASSERT_EQ(exit_code_of(2, help_past_argc), 2);
+
+    setup(&p);
+    argh_string(&p, 'o', "output", &out, "");
+    argh_flag(&p, 'v', "verbose", &verbose, "");
+    ASSERT_FALSE(argh_parse(&p, 2, value_past_argc));
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_MISSING_VALUE);
+}
+
+TEST(test_positionals_move_in_order)
+{
+    ARGV("a", "-v", "b", "-o", "x", "c", "-v");
+    bool verbose = false;
+    const char *out = NULL;
+    argh_values files = {0};
+    argh_parser p;
+    setup(&p);
+    argh_flag(&p, 'v', "verbose", &verbose, "");
+    argh_string(&p, 'o', "output", &out, "");
+    argh_rest(&p, "files", &files, "");
+
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(files.count, 3);
+    ASSERT_STR_EQ(argv[1], "a");
+    ASSERT_STR_EQ(argv[2], "b");
+    ASSERT_STR_EQ(argv[3], "c");
+    /* The rest of argv still holds the options, in their order */
+    ASSERT_STR_EQ(argv[4], "-v");
+    ASSERT_STR_EQ(argv[5], "-o");
+    ASSERT_STR_EQ(argv[6], "x");
+    ASSERT_STR_EQ(argv[7], "-v");
+}
+
+TEST(test_unexpected_argument_position)
+{
+    ARGV("-v", "one", "two");
+    bool verbose = false;
+    const char *first = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_flag(&p, 'v', "verbose", &verbose, "");
+    argh_pos(&p, "first", &first, "");
+
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_UNEXPECTED_ARGUMENT);
+    ASSERT_STR_EQ(argh_last_error(&p)->value, "two");
+    ASSERT_STR_EQ(error_text(&p), "unexpected argument 'two'");
+}
+
+TEST(test_int_lower_edge)
+{
+    ASSERT_EQ(parse_int_value("-2147483649"), ARGH_E_OUT_OF_RANGE);
+    ASSERT_EQ(parse_int_value("-0"), ARGH_E_NONE);
+}
+
+TEST(test_counter_env_minus_zero)
+{
+    ARGV0();
+    int debug = 7;
+    argh_parser p;
+    reset_output();
+    setup(&p);
+    argh_count(&p, 'd', "debug", &debug, "");
+    argh_env(&p, &debug, "TOOL_DEBUG");
+    set_env("TOOL_DEBUG", "-0");
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(debug, 0);
+}
+
+TEST(test_reserved_long_names)
+{
+    static bool b;
+    static const argh_opt help_long[] = {ARGH_FLAG(0, "help", &b, ""), ARGH_END};
+    static const argh_opt version_long[] = {ARGH_FLAG(0, "version", &b, ""), ARGH_END};
+    static const argh_opt hidden_long[] = {ARGH_FLAG(0, "hello", &b, ""), ARGH_FLAG(0, "verbose", &b, ""), ARGH_END};
+    ARGV0();
+    argh_parser p;
+
+    setup(&p);
+    argh_table(&p, help_long);
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_CONFIG);
+
+    setup(&p);
+    argh_version(&p, "1.0");
+    argh_table(&p, version_long);
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_EQ(argh_last_error(&p)->code, ARGH_E_CONFIG);
+
+    /* Same first letters are fine; --version is free without a version */
+    setup(&p);
+    argh_version(&p, "1.0");
+    argh_table(&p, hidden_long);
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+    setup(&p);
+    argh_table(&p, version_long);
+    ASSERT_TRUE(argh_parse(&p, argc, argv));
+}
+
+#if !defined(ARGH_NO_COMMANDS) && !defined(NDEBUG)
+TEST(test_reserved_help_in_nested_command)
+{
+    static bool b;
+    static const argh_opt bad[] = {ARGH_FLAG(0, "help", &b, ""), ARGH_END};
+    static const argh_cmd inner[] = {ARGH_CMD("add", "Add", bad), ARGH_CMD_END};
+    static const argh_cmd outer[] = {ARGH_CMD_GROUP("remote", "Remotes", inner), ARGH_CMD_END};
+    ARGV0();
+    argh_parser p;
+    setup(&p);
+    argh_commands(&p, outer);
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "configuration error: name reserved for help, see ARGH_NO_AUTO_HELP (--help)");
+}
+#endif
+
+#ifndef ARGH_NO_COMMANDS
+TEST(test_help_aligns_long_command_names)
+{
+    static const argh_cmd cmds[] = {ARGH_CMD("a-rather-long-name", "Long", NULL), ARGH_CMD("go", "Short", NULL),
+                                    ARGH_CMD_END};
+    ARGV("--help");
+    argh_parser p;
+    setup(&p);
+    argh_commands(&p, cmds);
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_TRUE(strstr(out_text, "  a-rather-long-name  Long\n  go                  Short\n") != NULL);
+}
+#endif
+
+TEST(test_short_only_option_in_errors)
+{
+    ARGV0();
+    const char *out = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_required(argh_string(&p, 'o', NULL, &out, ""));
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "missing required option '-o'");
+}
+
+#ifndef ARGH_NO_FLOAT
+TEST(test_double_messages)
+{
+    ARGV("--ratio", "half");
+    double ratio = 0.5;
+    argh_parser p;
+    setup(&p);
+    argh_double(&p, 'r', "ratio", &ratio, "Ratio");
+    ASSERT_FALSE(argh_parse(&p, argc, argv));
+    ASSERT_STR_EQ(error_text(&p), "invalid value 'half' for '--ratio': expected a number");
+    argh_print_help(&p);
+    ASSERT_TRUE(strstr(out_text, "-r, --ratio <x>") != NULL);
+}
+#endif
+
+#ifndef ARGH_NO_SUGGEST
+static const char *suggestion_near(const char *typed)
+{
+    char *argv[] = {(char *)"prog", (char *)typed, NULL};
+    int jobs = 0;
+    const char *out = NULL;
+    argh_parser p;
+    setup(&p);
+    argh_int(&p, 'j', "jobs", &jobs, "");
+    argh_string(&p, 'o', "output", &out, "");
+    (void)argh_parse(&p, 2, argv);
+    return argh_last_error(&p)->suggestion;
+}
+
+TEST(test_suggestion_edges)
+{
+    /* A swap of the first two letters is one edit */
+    ASSERT_STR_EQ(suggestion_near("--ojbs"), "jobs");
+    ASSERT_STR_EQ(suggestion_near("--otuput"), "output");
+    /* Two edits are allowed only when the name is long enough: 2 * 3 <= 6 */
+    ASSERT_STR_EQ(suggestion_near("--outp"), "output");
+    ASSERT_TRUE(suggestion_near("--jo") == NULL);
+    /* Too far from anything */
+    ASSERT_TRUE(suggestion_near("--xyz") == NULL);
+    /* The closer one wins */
+    ASSERT_STR_EQ(suggestion_near("--job"), "jobs");
+}
+#endif
 
 /* ============================================================================ */
 
@@ -4012,6 +4305,26 @@ int main(void)
     RUN_TEST(test_range_bounds_fit_the_type);
 #endif
     RUN_TEST(test_version_after_an_error);
+    RUN_TEST(test_every_error_exits_2);
+    RUN_TEST(test_argc_is_the_limit);
+    RUN_TEST(test_positionals_move_in_order);
+    RUN_TEST(test_unexpected_argument_position);
+    RUN_TEST(test_int_lower_edge);
+    RUN_TEST(test_counter_env_minus_zero);
+    RUN_TEST(test_reserved_long_names);
+#if !defined(ARGH_NO_COMMANDS) && !defined(NDEBUG)
+    RUN_TEST(test_reserved_help_in_nested_command);
+#endif
+#ifndef ARGH_NO_COMMANDS
+    RUN_TEST(test_help_aligns_long_command_names);
+#endif
+    RUN_TEST(test_short_only_option_in_errors);
+#ifndef ARGH_NO_FLOAT
+    RUN_TEST(test_double_messages);
+#endif
+#ifndef ARGH_NO_SUGGEST
+    RUN_TEST(test_suggestion_edges);
+#endif
 #if !defined(ARGH_NO_STDIO) && !defined(ARGH_NO_COMPLETION)
     RUN_TEST(test_completions_print_like_help);
     RUN_TEST(test_completions_bash_content);
@@ -4022,6 +4335,7 @@ int main(void)
 #ifndef ARGH_NO_COMMANDS
     RUN_TEST(test_completions_commands);
     RUN_TEST(test_completions_fish_commands);
+    RUN_TEST(test_completion_scripts_match_expected);
 #endif
 #endif
     RUN_TEST(test_int_syntax_edges);

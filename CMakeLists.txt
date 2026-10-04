@@ -84,7 +84,8 @@ if(ARGH_BUILD_TESTS)
     enable_testing()
     add_executable(argh_test tests/test_argh.c)
     target_link_libraries(argh_test PRIVATE aargh::aargh)
-    add_test(NAME unit COMMAND argh_test)
+    # From the source tree, where the tests find their expected files
+    add_test(NAME unit COMMAND argh_test WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
 
     add_executable(argh_nostdio tests/nostdio_check.c)
     target_link_libraries(argh_nostdio PRIVATE aargh::aargh)

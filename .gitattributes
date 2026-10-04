@@ -4,3 +4,6 @@
 # Sample files for the examples: same bytes on every platform, so the
 # documented output of wc and logship holds everywhere
 examples/data/* text eol=lf
+
+# Expected completion scripts: compared byte for byte by the tests
+tests/completion/expected/* text eol=lf

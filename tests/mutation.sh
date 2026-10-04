@@ -7,7 +7,7 @@
 # (Ubuntu 24.04, x86-64 or ARM64) into $MULL_DIR.
 # Usage: sh tests/mutation.sh [min-percent]
 set -e
-MIN=${1:-87}
+MIN=${1:-91}
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 MULL_VERSION=0.34.1
 MULL_DIR=${MULL_DIR:-$HOME/.cache/mull}
@@ -35,9 +35,9 @@ fi
 # mull.yml in the repository root says what to mutate: argh.h only
 cd "$ROOT"
 clang -std=c99 -O0 -g -grecord-command-line -fpass-plugin="$PLUGIN" -o "$OUT/test_argh" tests/test_argh.c
-cd "$OUT"
+# From the repository root, where the tests find their expected files.
 # The runner exits non-zero whenever a mutant survives; the score decides here
-"$RUNNER" --reporters=IDE --no-output ./test_argh >"$OUT/log" 2>&1 || true
+"$RUNNER" --reporters=IDE --no-output "$OUT/test_argh" >"$OUT/log" 2>&1 || true
 grep -q "Mutation score:" "$OUT/log" || { cat "$OUT/log"; exit 1; }
 
 # One survivor per line: argh.h:LINE: what was changed
