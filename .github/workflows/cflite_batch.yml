@@ -1,8 +1,9 @@
 name: ClusterFuzzLite nightly fuzzing
 
-# An hour per sanitizer every night, and on demand. A crash fails the run,
-# and the input that caused it is attached; save it to tests/fuzz so `make
-# test` replays it from then on.
+# An hour per sanitizer every night, and on demand. Each night continues from
+# the corpus the previous ones built (kept as an Actions artifact). A crash
+# fails the run, and the input that caused it is attached; save it to
+# tests/fuzz so `make test` replays it from then on.
 on:
   schedule:
     - cron: "17 2 * * *"
