@@ -32,7 +32,7 @@ jobs:
         run: make CC=${{ matrix.cc }} c23
 
   sanitizers:
-    name: ubuntu / clang / ASan + UBSan
+    name: ubuntu / clang / ASan + UBSan + TSan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -42,6 +42,9 @@ jobs:
           -fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
       - name: Fuzz argh_parse for 2 minutes
         run: make fuzz FUZZ_TIME=120
+      - name: Parsing in 8 threads at once, under ThreadSanitizer
+        # TSan needs the smaller address randomization of older kernels
+        run: sudo sysctl vm.mmap_rnd_bits=28 && make CC=clang thread-check
       - name: Reduced release build (ARGH_NO_COMMANDS, ARGH_NO_SUGGEST, ARGH_NO_STDIO, ARGH_NO_FLOAT, ARGH_HELP_WIDTH=0, NDEBUG)
         run: >
           make clean && make CC=clang test
