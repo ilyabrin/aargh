@@ -155,7 +155,7 @@ For a program in one file, or a library that ships its own copy of argh.h, `#def
 | `argh_int`    | `ARGH_INT`    | `int`          | `-j4`, `-j 4`, `--jobs=4`, `--jobs 0x10` |
 | `argh_long`   | `ARGH_LONG`   | `long`         | same as `int`                            |
 | `argh_uint`   | `ARGH_UINT`   | `unsigned`     | same as `int`, a minus sign is an error  |
-| `argh_size`   | `ARGH_SIZE`   | `size_t`       | same as `unsigned`                       |
+| `argh_size`   | `ARGH_SIZE`   | `size_t`       | `--buf 512`, `--buf 64K`, `--buf 4MiB`   |
 | `argh_double` | `ARGH_DOUBLE` | `double`       | `--ratio 0.5`, `--ratio=1e-3`            |
 | `argh_string` | `ARGH_STRING` | `const char *` | `-o file`, `-ofile`, `--output=file`     |
 | `argh_enum`   | `ARGH_ENUM`   | `int` (index)  | `--mode fast`                            |
@@ -165,6 +165,8 @@ For a program in one file, or a library that ships its own copy of argh.h, `#def
 | `argh_custom` | `ARGH_CUSTOM` | anything       | your parser, see below                   |
 
 Pass `0` as the short name for a long-only option, and `NULL` as the long name for a short-only one.
+
+Sizes take a binary unit: `K`, `M`, `G` or `T` in either case, optionally followed by `iB`, each a factor of 1024 (`64K` is 65536, `4MiB` is 4194304). A size that doesn't fit in `size_t` is out of range, and a range set with `argh_range` applies to the bytes. Decimal units like `KB` are refused rather than guessed.
 
 ### Choices, lists and the rest of the arguments
 
@@ -188,7 +190,7 @@ for (int i = 0; i < files.count; i++)
 
 ### Your own value types
 
-Sizes like `10M`, durations like `30s`, `host:port` pairs: describe the type once with a parse function, then use it for any number of options.
+Durations like `30s`, `host:port` pairs, sizes in your own units: describe the type once with a parse function, then use it for any number of options.
 
 <!-- docs-check: source=tests/docs/sizetool.c -->
 ```c

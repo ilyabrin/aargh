@@ -8,6 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
+- Size options (`argh_size`, `ARGH_SIZE`) take binary units: `--buf 64K`, `--cache 4M`, `--limit 1G`, `2T`, also written `4MiB` and in lowercase. Each unit is a factor of 1024. Values that don't fit in `size_t` are out of range, `argh_range` bounds apply to the bytes, and decimal units like `KB` are refused. A bad size now says `expected a size such as 512, 64K or 4M`. Costs about 110 bytes on firmware.
 - Mutation testing with Mull in CI (`make mutation`): every pull request checks that the tests notice small changes to argh.h. It started at 86% of 1,434 changes caught; new tests bring it to 91%: flag words (`on`, `off`, `yes`, `no`), `argh_given` on positionals and environment counters, range edges, `--version` after an error, exit code 2 for every kind of usage error, `argc` as the limit when `argv` goes on, the order positionals end up in, reserved long names in tables and nested commands, number edges, messages for doubles and short-only options, suggestion distances, and the completion scripts compared byte for byte with `tests/completion/expected`.
 - Continuous fuzzing with ClusterFuzzLite: 5 minutes per sanitizer (address, undefined, memory) on every pull request that touches the parser, and an hour each every night, continuing from the corpus earlier nights built (pruned daily; a coverage report lets PR fuzzing aim at the changed code). The fuzz target gets a dictionary of its options and commands (`tests/fuzz_argh.dict`), which `make fuzz` uses too.
 
