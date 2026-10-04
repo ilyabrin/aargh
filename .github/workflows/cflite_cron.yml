@@ -1,0 +1,43 @@
+name: ClusterFuzzLite corpus and coverage
+
+# Keeps the corpus that nightly fuzzing builds up useful: pruning drops
+# inputs that add nothing, and the coverage report lets PR fuzzing aim at the
+# changed code. Both are stored as Actions artifacts, like the corpus itself.
+on:
+  schedule:
+    - cron: "47 5 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build the fuzz target
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: c
+      - name: Prune the corpus
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 600
+          mode: prune
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build the fuzz target with coverage
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: c
+          sanitizer: coverage
+      - name: Measure the corpus's coverage
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 600
+          mode: coverage
+          sanitizer: coverage

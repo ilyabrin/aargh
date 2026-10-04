@@ -14,10 +14,10 @@ for build in debug release; do
     mkdir -p "$OUT/$build"
     flags=
     [ "$build" = release ] && flags=-DNDEBUG
-    (cd "$OUT/$build" &&
-        gcc -std=c99 -O0 --coverage $flags -I"$ROOT" -o t "$ROOT/tests/test_argh.c" -lm &&
-        ./t >/dev/null &&
-        gcov -o . t-test_argh.gcda >/dev/null)
+    # The tests run from the repository root, where their expected files are
+    (cd "$OUT/$build" && gcc -std=c99 -O0 --coverage $flags -I"$ROOT" -o t "$ROOT/tests/test_argh.c" -lm)
+    (cd "$ROOT" && "$OUT/$build/t" >/dev/null)
+    (cd "$OUT/$build" && gcov -o . t-test_argh.gcda >/dev/null)
 done
 
 # A .gcov line is "count: line: source"; '-' is not code, '#####' never ran
