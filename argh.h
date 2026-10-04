@@ -1,5 +1,5 @@
 /*
- * argh.h - v1.11.0 - Single-header command-line argument parser for C
+ * argh.h - v1.12.0 - Single-header command-line argument parser for C
  *
  * The API follows Semantic Versioning: no breaking changes before v2.0.
  *
@@ -57,9 +57,9 @@
  *     #error "needs argh.h 1.0 or later"
  *     #endif */
 #define ARGH_VERSION_MAJOR 1
-#define ARGH_VERSION_MINOR 11
+#define ARGH_VERSION_MINOR 12
 #define ARGH_VERSION_PATCH 0
-#define ARGH_VERSION "1.11.0"
+#define ARGH_VERSION "1.12.0"
 
 /* ARGH_STATIC: every function is static and the implementation is included,
  * for a program in one file or a library that embeds its own copy of argh.h
@@ -146,7 +146,7 @@ extern "C"
         ARGH__K_INT,     /* int:           -j 4, --jobs=4 */
         ARGH__K_LONG,    /* long:          same as int */
         ARGH__K_UINT,    /* unsigned:      -n 4, no minus sign */
-        ARGH__K_SIZE,    /* size_t:        same as unsigned */
+        ARGH__K_SIZE,    /* size_t:        --buf 64K, units K M G T */
         ARGH__K_DOUBLE,  /* double:        --ratio 0.5 */
         ARGH__K_STRING,  /* const char *:  -o file */
         ARGH__K_ENUM,    /* int (index):   --mode fast */
@@ -986,41 +986,43 @@ extern "C"
      * Value conversion: strict, whole string, no surrounding spaces
      * ------------------------------------------------------------------------ */
 
-    /* Decimal or 0x hex with an optional sign. Octal is never used. */
-    static bool argh__int_syntax(const char *s, int *base)
+    /* Decimal or 0x hex with an optional sign. Octal is never used. Returns
+     * where the digits end, or NULL when there are none. */
+    static const char *argh__int_syntax(const char *s, int *base)
     {
+        const char *start;
         if (*s == '+' || *s == '-')
             s++;
-        if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
-        {
-            s += 2;
-            *base = 16;
-            if (!*s)
-                return false;
-            for (; *s; s++)
-                if (!isxdigit((unsigned char)*s))
-                    return false;
-            return true;
-        }
         *base = 10;
-        if (!*s)
-            return false;
-        for (; *s; s++)
-            if (!isdigit((unsigned char)*s))
-                return false;
-        return true;
+        if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+            s += 2, *base = 16;
+        for (start = s; *base == 16 ? isxdigit((unsigned char)*s) : isdigit((unsigned char)*s); s++)
+            ;
+        return s == start ? NULL : s;
     }
 
     /* No minus sign: strtoul would wrap "-1" around to the maximum. The digit
-     * loop works for any width and keeps strtol out of firmware images. */
-    static argh_err argh__parse_uint(const char *s, argh__uint hi, argh__uint *out)
+     * loop works for any width and keeps strtol out of firmware images.
+     * With units, a size may end in K, M, G or T (any case), optionally
+     * followed by iB: 64K, 4MiB. Each is a factor of 1024. */
+    static argh_err argh__parse_uint(const char *s, argh__uint hi, argh__uint *out, bool units)
     {
         int base;
+        unsigned shift = 0;
         argh__uint v = 0;
-        if (*s == '-' || !argh__int_syntax(s, &base))
+        const char *end = argh__int_syntax(s, &base);
+        if (*s == '-' || !end)
             return ARGH_E_INVALID_VALUE;
+        if (*end)
+        {
+            static const char kmgt[] = "kmgt";
+            const char *u = units ? strchr(kmgt, *end | 0x20) : NULL;
+            if (!u || (end[1] && strcmp(end + 1, "iB") != 0))
+                return ARGH_E_INVALID_VALUE;
+            shift = (unsigned)(u - kmgt) + 1;
+        }
         s += (*s == '+') + (base == 16 ? 2 : 0);
-        for (; *s; s++)
+        for (; s < end; s++)
         {
             unsigned d = isdigit((unsigned char)*s) ? (unsigned)(*s - '0')
                                                     : (unsigned)(tolower((unsigned char)*s) - 'a' + 10);
@@ -1028,6 +1030,9 @@ extern "C"
                 return ARGH_E_OUT_OF_RANGE;
             v = v * (unsigned)base + d;
         }
+        for (; shift; shift--, v <<= 10)
+            if (v > hi >> 10)
+                return ARGH_E_OUT_OF_RANGE;
         *out = v;
         return ARGH_E_NONE;
     }
@@ -1040,7 +1045,7 @@ extern "C"
         argh_err e;
         if (neg && s[1] == '+')
             return ARGH_E_INVALID_VALUE;
-        e = argh__parse_uint(s + neg, neg ? 0UL - (unsigned long)lo : (unsigned long)hi, &u);
+        e = argh__parse_uint(s + neg, neg ? 0UL - (unsigned long)lo : (unsigned long)hi, &u, false);
         if (e == ARGH_E_NONE)
             /* Built from u - 1 so that LONG_MIN doesn't overflow */
             *out = neg ? (u ? -(long)(u - 1) - 1 : 0) : (long)u;
@@ -1131,7 +1136,11 @@ extern "C"
             return ARGH_E_NONE;
         case ARGH__K_UINT:
         case ARGH__K_SIZE:
-            if ((e = argh__parse_uint(v, o->kind == ARGH__K_UINT ? UINT_MAX : SIZE_MAX, &u)) != ARGH_E_NONE)
+            if (o->kind == ARGH__K_SIZE)
+                e = argh__parse_uint(v, SIZE_MAX, &u, true);
+            else
+                e = argh__parse_uint(v, UINT_MAX, &u, false);
+            if (e != ARGH_E_NONE)
                 return e;
             /* Bounds of an unsigned option are never negative (checked) */
             if ((r = argh__after(o, ARGH__K_RANGE)) != NULL &&
@@ -2632,8 +2641,10 @@ extern "C"
             argh__sb_put(b, "expected an integer");
             break;
         case ARGH__K_UINT:
-        case ARGH__K_SIZE:
             argh__sb_put(b, "expected a non-negative integer");
+            break;
+        case ARGH__K_SIZE:
+            argh__sb_put(b, "expected a size such as 512, 64K or 4M");
             break;
         case ARGH__K_DOUBLE:
             argh__sb_put(b, "expected a number");

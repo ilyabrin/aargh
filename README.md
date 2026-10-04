@@ -42,7 +42,8 @@ The library is one header, `argh.h`; its packages are called **aargh**. Pick the
 | Anything | copy [argh.h](argh.h) into your project |
 | CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `aargh::aargh` |
 | Meson | the repository in `subprojects/aargh`, then `dependency('aargh')` |
-| Conan 2 | `conan create .` in this repository, then require `aargh/1.11.0` |
+| Conan 2 | `conan create .` in this repository, then require `aargh/1.12.0` |
+| xmake | `add_requires("aargh")`, then `add_packages("aargh")` |
 | clib | `clib install ilyabrin/aargh` |
 | Make and others | `cc $(pkg-config --cflags aargh) ...` after installing |
 
@@ -50,13 +51,13 @@ The library is one header, `argh.h`; its packages are called **aargh**. Pick the
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.11.0)
+FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.12.0)
 FetchContent_MakeAvailable(aargh)
 
 target_link_libraries(app PRIVATE aargh::aargh)
 ```
 
-With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.11 REQUIRED)`: it accepts any later 1.x, never 2.0.
+With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.12 REQUIRED)`: it accepts any later 1.x, never 2.0.
 
 **Install** the header, the CMake package and `aargh.pc` (for pkg-config):
 
@@ -155,7 +156,7 @@ For a program in one file, or a library that ships its own copy of argh.h, `#def
 | `argh_int`    | `ARGH_INT`    | `int`          | `-j4`, `-j 4`, `--jobs=4`, `--jobs 0x10` |
 | `argh_long`   | `ARGH_LONG`   | `long`         | same as `int`                            |
 | `argh_uint`   | `ARGH_UINT`   | `unsigned`     | same as `int`, a minus sign is an error  |
-| `argh_size`   | `ARGH_SIZE`   | `size_t`       | same as `unsigned`                       |
+| `argh_size`   | `ARGH_SIZE`   | `size_t`       | `--buf 512`, `--buf 64K`, `--buf 4MiB`   |
 | `argh_double` | `ARGH_DOUBLE` | `double`       | `--ratio 0.5`, `--ratio=1e-3`            |
 | `argh_string` | `ARGH_STRING` | `const char *` | `-o file`, `-ofile`, `--output=file`     |
 | `argh_enum`   | `ARGH_ENUM`   | `int` (index)  | `--mode fast`                            |
@@ -165,6 +166,8 @@ For a program in one file, or a library that ships its own copy of argh.h, `#def
 | `argh_custom` | `ARGH_CUSTOM` | anything       | your parser, see below                   |
 
 Pass `0` as the short name for a long-only option, and `NULL` as the long name for a short-only one.
+
+Sizes take a binary unit: `K`, `M`, `G` or `T` in either case, optionally followed by `iB`, each a factor of 1024 (`64K` is 65536, `4MiB` is 4194304). A size that doesn't fit in `size_t` is out of range, and a range set with `argh_range` applies to the bytes. Decimal units like `KB` are refused rather than guessed.
 
 ### Choices, lists and the rest of the arguments
 
@@ -188,7 +191,7 @@ for (int i = 0; i < files.count; i++)
 
 ### Your own value types
 
-Sizes like `10M`, durations like `30s`, `host:port` pairs: describe the type once with a parse function, then use it for any number of options.
+Durations like `30s`, `host:port` pairs, sizes in your own units: describe the type once with a parse function, then use it for any number of options.
 
 <!-- docs-check: source=tests/docs/sizetool.c -->
 ```c
@@ -898,7 +901,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.11.0" */
+ARGH_VERSION          /* "1.12.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
