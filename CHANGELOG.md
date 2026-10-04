@@ -6,6 +6,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-10-04
+
+### Added
+
+- With C23 or C++17, ignoring the result of `argh_parse`, `argh_exit_code`, `argh_given`, `argh_command` or `argh_last_error` is a warning (`[[nodiscard]]`); `(void)` silences it. C99 to C17 and older C++ see no change. argh still needs only C99.
+- README: a "Threads" section. argh has no global or static state that changes, so parsers in different threads are independent; it lists what threads must not share.
+- CI parses in 8 threads at once under ThreadSanitizer (`make thread-check`), with help and completion scripts too.
+- CI builds the tests as C23 with GCC and Clang on Linux and macOS (`make c23`), and checks that a dropped `argh_parse` result is caught there.
+
 ## [1.10.0] - 2026-10-04
 
 ### Added
@@ -234,7 +243,8 @@ Compared with the code before the public release:
 
 - `argh_set_description` and `argh_set_help_width`, which had no effect.
 
-[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.10.0...HEAD
+[Unreleased]: https://github.com/ilyabrin/aargh/compare/v1.11.0...HEAD
+[1.11.0]: https://github.com/ilyabrin/aargh/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/ilyabrin/aargh/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/ilyabrin/aargh/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/ilyabrin/aargh/compare/v1.7.0...v1.8.0

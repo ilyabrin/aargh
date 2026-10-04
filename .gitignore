@@ -58,6 +58,8 @@ desktop.ini
 /nostdio_check
 /static_check
 /fuzz_replay
+/nodiscard_check
+/thread_check
 /fuzz_argh
 /fuzz_corpus/
 crash-*

@@ -42,7 +42,7 @@ The library is one header, `argh.h`; its packages are called **aargh**. Pick the
 | Anything | copy [argh.h](argh.h) into your project |
 | CMake | `FetchContent`, `add_subdirectory` or `find_package`, then link `aargh::aargh` |
 | Meson | the repository in `subprojects/aargh`, then `dependency('aargh')` |
-| Conan 2 | `conan create .` in this repository, then require `aargh/1.10.0` |
+| Conan 2 | `conan create .` in this repository, then require `aargh/1.11.0` |
 | clib | `clib install ilyabrin/aargh` |
 | Make and others | `cc $(pkg-config --cflags aargh) ...` after installing |
 
@@ -50,13 +50,13 @@ The library is one header, `argh.h`; its packages are called **aargh**. Pick the
 
 ```cmake
 include(FetchContent)
-FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.10.0)
+FetchContent_Declare(aargh GIT_REPOSITORY https://github.com/ilyabrin/aargh GIT_TAG v1.11.0)
 FetchContent_MakeAvailable(aargh)
 
 target_link_libraries(app PRIVATE aargh::aargh)
 ```
 
-With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.10 REQUIRED)`: it accepts any later 1.x, never 2.0.
+With a copy or a git submodule in `third_party/aargh`, use `add_subdirectory(third_party/aargh)` instead of the first three lines. After installing, `find_package(aargh 1.11 REQUIRED)`: it accepts any later 1.x, never 2.0.
 
 **Install** the header, the CMake package and `aargh.pc` (for pkg-config):
 
@@ -721,6 +721,16 @@ static void my_writer(void *ctx, bool to_stderr, const char *text, size_t len)
 argh_set_writer(&p, my_writer, NULL);
 ```
 
+### Threads
+
+argh keeps no global or static state that changes: everything a parse touches is in your `argh_parser` and your variables. So threads can parse at the same time with no locks, as long as they don't share what is written:
+
+- **One parser per thread.** `argh_parse` writes to the parser, so two threads must not use the same one at once.
+- **Your variables are written.** A `static const` table is only read, but it holds the addresses of your variables; two threads parsing with the same table write the same variables. Give each thread its own variables (builder calls, or a table per thread).
+- **The C library's rules still apply:** with `ARGH_ENV`, don't change the environment (`setenv`) in another thread during a parse, and don't call `setlocale` meanwhile. A writer you set with `argh_set_writer` is called from the parsing thread.
+
+CI runs 8 threads parsing, printing help and generating completion scripts at once under ThreadSanitizer (`make thread-check`).
+
 ### Microcontrollers
 
 Define two macros and give argh a writer:
@@ -797,6 +807,8 @@ Mistakes in the definitions, such as two options with the same name or a missing
 Everything public in `argh.h`. Names marked *commands* are missing with `ARGH_NO_COMMANDS`, and *float* ones with `ARGH_NO_FLOAT`.
 
 ### Functions
+
+argh is C99. With C23 or C++17, ignoring the result of `argh_parse`, `argh_exit_code`, `argh_given`, `argh_command` or `argh_last_error` is a warning (`[[nodiscard]]`); write `(void)` in front when you mean it.
 
 <!-- docs-check: skip -->
 ```c
@@ -886,7 +898,7 @@ argh_values list = ARGH_VALUES(buf);
 
 /* The version of argh.h, for compile-time checks */
 ARGH_VERSION_MAJOR    ARGH_VERSION_MINOR    ARGH_VERSION_PATCH
-ARGH_VERSION          /* "1.10.0" */
+ARGH_VERSION          /* "1.11.0" */
 ```
 
 Option flags, combined with `|`: `ARGH_REQUIRED`, `ARGH_OPTIONAL` (positionals), `ARGH_HIDDEN`, `ARGH_NEGATABLE` (flags), `ARGH_ONCE`. Parser flags: `ARGH_POSIX`, `ARGH_NO_AUTO_HELP`.
@@ -1032,11 +1044,13 @@ make docs-check # README examples and llms.txt match the code (Python 3)
 make coverage   # lines of argh.h the tests run, at least 98% (gcc, gcov)
 make package-check # CMake, pkg-config, Conan and Meson builds of a program that uses argh
 make completion-check # the completion scripts in bash, zsh and fish
+make c23        # the tests as C23, and [[nodiscard]] at work
+make thread-check # 8 threads parsing at once, under ThreadSanitizer
 ```
 
 With CMake instead of make, on any platform: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.
 
-CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer and UndefinedBehaviorSanitizer, 2 minutes of fuzzing, the coverage minimum, every way of installing argh, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
+CI runs all of these on every pull request: on Linux (x86-64 and ARM64), macOS (ARM64) and Windows, with GCC, Clang, MinGW and MSVC; as 32-bit x86; and under qemu on 32-bit ARM and on big-endian s390x and PowerPC. On top of that come AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer, 2 minutes of fuzzing, the coverage minimum, every way of installing argh, and the firmware size check. The fuzz target ([tests/fuzz_argh.c](tests/fuzz_argh.c)) feeds random command lines to a parser that uses every feature, and checks that `argv` is only reordered, that stored strings point into `argv`, and that error messages are consistent.
 
 ## Contributing
 
