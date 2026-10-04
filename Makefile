@@ -34,7 +34,7 @@ endif
 EXAMPLES = examples/wc$(EXE) examples/logship$(EXE) examples/pkg/pkg$(EXE)
 PKG_SRC  = examples/pkg/main.c examples/pkg/install.c examples/pkg/remote.c examples/pkg/exec.c
 
-.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check c23 fuzz cxx clean
+.PHONY: all test examples smoke bench size-arm docs-check coverage package-check completion-check c23 thread-check fuzz cxx clean
 
 all: test_argh$(EXE) $(EXAMPLES)
 
@@ -116,6 +116,11 @@ c23:
 	! $(CC) -std=c2x -Werror -o nodiscard_check$(EXE) tests/nodiscard_check.c 2>/dev/null
 	@echo "C23: dropped results are caught"
 
+# Many threads parsing at once, under ThreadSanitizer (clang or gcc, POSIX)
+thread-check:
+	$(CC) -std=c99 -Wall -Wextra -Werror -g -O1 -fsanitize=thread -o thread_check$(EXE) tests/thread_check.c -lpthread
+	TSAN_OPTIONS=halt_on_error=1 ./thread_check$(EXE)
+
 size-arm:
 	sh bench/size_arm.sh
 
@@ -123,4 +128,4 @@ cxx: tests/cxx_check.cpp argh.h
 	$(CXX) -std=c++11 -Wall -Wextra -Wpedantic -Werror -o cxx_check$(EXE) tests/cxx_check.cpp
 
 clean:
-	-$(RM) $(call fixpath,test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) static_check$(EXE) nodiscard_check$(EXE) bench_parse$(EXE) cxx_check$(EXE) $(EXAMPLES))
+	-$(RM) $(call fixpath,test_argh$(EXE) nostdio_check$(EXE) fuzz_replay$(EXE) static_check$(EXE) nodiscard_check$(EXE) thread_check$(EXE) bench_parse$(EXE) cxx_check$(EXE) $(EXAMPLES))
