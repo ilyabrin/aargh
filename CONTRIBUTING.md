@@ -38,7 +38,7 @@ CI runs the same commands on Linux x86-64 and ARM64 (GCC, Clang, plus AddressSan
 make CC=clang test CFLAGS="-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g -fsanitize=address,undefined"
 ```
 
-For parsing changes, also fuzz for a few minutes: `make fuzz FUZZ_TIME=300` (needs clang with libFuzzer, for example on Linux or WSL). If it finds a crash, it saves the input as `crash-*`; add that file to [tests/fuzz](tests/fuzz) so `make test` replays it from then on.
+For parsing changes, also fuzz for a few minutes: `make fuzz FUZZ_TIME=300` (needs clang with libFuzzer, for example on Linux or WSL). If it finds a crash, it saves the input as `crash-*`; add that file to [tests/fuzz](tests/fuzz) so `make test` replays it from then on. ClusterFuzzLite also fuzzes every pull request that touches argh.h (5 minutes per sanitizer) and runs an hour per sanitizer every night ([.clusterfuzzlite](.clusterfuzzlite)); a crash there attaches the input to the run, which goes to tests/fuzz the same way. New options or commands in the fuzz target belong in [tests/fuzz_argh.dict](tests/fuzz_argh.dict) too.
 
 ## What a good pull request looks like
 

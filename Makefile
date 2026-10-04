@@ -68,7 +68,7 @@ FUZZ_TIME ?= 60
 fuzz: tests/fuzz_argh.c argh.h
 	$(FUZZ_CC) -std=c99 -g -O1 -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=all -o fuzz_argh tests/fuzz_argh.c
 	mkdir -p fuzz_corpus
-	./fuzz_argh -max_total_time=$(FUZZ_TIME) -max_len=1024 fuzz_corpus tests/fuzz
+	./fuzz_argh -max_total_time=$(FUZZ_TIME) -max_len=1024 -dict=tests/fuzz_argh.dict fuzz_corpus tests/fuzz
 
 examples: $(EXAMPLES)
 

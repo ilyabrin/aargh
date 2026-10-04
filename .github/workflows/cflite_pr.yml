@@ -1,0 +1,43 @@
+name: ClusterFuzzLite PR fuzzing
+
+# Every pull request that touches the parser or the fuzz target: 5 minutes per
+# sanitizer on the changed code. A crash fails the check and the reproducer
+# is attached to the run.
+on:
+  pull_request:
+    paths:
+      - argh.h
+      - tests/fuzz_argh.c
+      - tests/fuzz_argh.dict
+      - tests/fuzz/**
+      - .clusterfuzzlite/**
+      - .github/workflows/cflite_pr.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: ${{ matrix.sanitizer }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ${{ github.workflow }}-${{ matrix.sanitizer }}-${{ github.ref }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined, memory]
+    steps:
+      - name: Build the fuzz target
+        uses: google/clusterfuzzlite/actions/build_fuzzers@v1
+        with:
+          language: c
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          sanitizer: ${{ matrix.sanitizer }}
+      - name: Fuzz for 5 minutes
+        uses: google/clusterfuzzlite/actions/run_fuzzers@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          fuzz-seconds: 300
+          mode: code-change
+          sanitizer: ${{ matrix.sanitizer }}
