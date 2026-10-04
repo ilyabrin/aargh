@@ -316,7 +316,7 @@ static argh_err parse_int_value(const char *text)
     argh_parser p;
     setup(&p);
     argh_int(&p, 'n', "num", &n, "");
-    argh_parse(&p, 3, argv);
+    (void)argh_parse(&p, 3, argv);
     return argh_last_error(&p)->code;
 }
 
@@ -400,7 +400,7 @@ static argh_err parse_uint_value(const char *text, bool size)
         argh_size(&p, 'n', "num", &z, "");
     else
         argh_uint(&p, 'n', "num", &n, "");
-    argh_parse(&p, 3, argv);
+    (void)argh_parse(&p, 3, argv);
     /* A rejected value must leave the variable alone */
     if (argh_last_error(&p)->code != ARGH_E_NONE && (n != 7 || z != 7))
         return ARGH_E_CONFIG;
@@ -512,7 +512,7 @@ static argh_err parse_double_value(const char *text)
     argh_parser p;
     setup(&p);
     argh_double(&p, 0, "x", &x, "");
-    argh_parse(&p, 3, argv);
+    (void)argh_parse(&p, 3, argv);
     return argh_last_error(&p)->code;
 }
 
@@ -1510,7 +1510,7 @@ static argh_err parse_with_rules(int argc, char **argv, argh_parser *p)
     argh_string(p, 0, "tls-key", &r_key, "");
     argh_string(p, 0, "tls-cert", &r_cert, "");
     argh_rules(p, r_rules);
-    argh_parse(p, argc, argv);
+    (void)argh_parse(p, argc, argv);
     return argh_last_error(p)->code;
 }
 
@@ -2241,7 +2241,7 @@ static const char *suggestion_for(const char *arg)
     argh_flag(&p, 0, "color", &color, "");
     argh_hidden(argh_flag(&p, 0, "secret-mode", &secret, ""));
     argh_int(&p, 'j', "jobs", &jobs, "");
-    argh_parse(&p, 2, argv);
+    (void)argh_parse(&p, 2, argv);
     return argh_last_error(&p)->suggestion;
 }
 
@@ -2743,7 +2743,7 @@ static const char *example_error(argh_parser *p, const char *example)
     table[1] = end;
     argh_table(p, table);
     reset_output();
-    argh_parse(p, 1, argv);
+    (void)argh_parse(p, 1, argv);
     return err_text;
 }
 
@@ -3046,7 +3046,7 @@ static argh_err implicit_config(const argh_opt *opts, const char **detail)
     argh_parser p;
     setup(&p);
     argh_table(&p, opts);
-    argh_parse(&p, argc, argv);
+    (void)argh_parse(&p, argc, argv);
     *detail = error_text(&p);
     return argh_last_error(&p)->code;
 }

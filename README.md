@@ -798,6 +798,8 @@ Everything public in `argh.h`. Names marked *commands* are missing with `ARGH_NO
 
 ### Functions
 
+argh is C99. With C23 or C++17, ignoring the result of `argh_parse`, `argh_exit_code`, `argh_given`, `argh_command` or `argh_last_error` is a warning (`[[nodiscard]]`); write `(void)` in front when you mean it.
+
 <!-- docs-check: skip -->
 ```c
 /* Setup */
@@ -1032,6 +1034,7 @@ make docs-check # README examples and llms.txt match the code (Python 3)
 make coverage   # lines of argh.h the tests run, at least 98% (gcc, gcov)
 make package-check # CMake, pkg-config, Conan and Meson builds of a program that uses argh
 make completion-check # the completion scripts in bash, zsh and fish
+make c23        # the tests as C23, and [[nodiscard]] at work
 ```
 
 With CMake instead of make, on any platform: `cmake -S . -B build && cmake --build build && ctest --test-dir build`.

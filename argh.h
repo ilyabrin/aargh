@@ -77,6 +77,20 @@
 #define ARGH__DEF extern
 #endif
 
+/* Results that are a bug to ignore: C23 and C++17 warn when one is dropped,
+ * and (void) says it is on purpose. Older compilers see nothing. GCC's
+ * warn_unused_result is left out on purpose: (void) can't silence it. */
+#if defined(__cplusplus) && __cplusplus >= 201703L
+#define ARGH__NODISCARD [[nodiscard]]
+#elif !defined(__cplusplus) && defined(__STDC_VERSION__) && __STDC_VERSION__ > 201710L && defined(__has_c_attribute)
+#if __has_c_attribute(nodiscard)
+#define ARGH__NODISCARD [[nodiscard]]
+#endif
+#endif
+#ifndef ARGH__NODISCARD
+#define ARGH__NODISCARD
+#endif
+
 #ifndef ARGH_BUILDER_CAP
 #define ARGH_BUILDER_CAP 32
 #endif
@@ -434,17 +448,17 @@ extern "C"
     /* Returns true when the program should continue. Returns false after
      * printing help, the version, or an error; then return argh_exit_code().
      * argv is reordered in place: positionals end up first, in order. */
-    ARGH__DEF bool argh_parse(argh_parser *p, int argc, char **argv);
+    ARGH__NODISCARD ARGH__DEF bool argh_parse(argh_parser *p, int argc, char **argv);
 
     /* 0 after --help/--version or success, 2 after a usage error. */
-    ARGH__DEF int argh_exit_code(const argh_parser *p);
+    ARGH__NODISCARD ARGH__DEF int argh_exit_code(const argh_parser *p);
 
     /* True if the option bound to target appeared on the command line. */
-    ARGH__DEF bool argh_given(const argh_parser *p, const void *target);
+    ARGH__NODISCARD ARGH__DEF bool argh_given(const argh_parser *p, const void *target);
 
 #ifndef ARGH_NO_COMMANDS
     /* The command that was selected (the deepest one), NULL without commands. */
-    ARGH__DEF const argh_cmd *argh_command(const argh_parser *p);
+    ARGH__NODISCARD ARGH__DEF const argh_cmd *argh_command(const argh_parser *p);
 
     /* Calls the selected command's handler and returns its result, or 0 if the
      * command has no handler. */
@@ -452,7 +466,7 @@ extern "C"
 #endif
 
     /* The error from the last argh_parse(), code ARGH_E_NONE if none. */
-    ARGH__DEF const argh_error *argh_last_error(const argh_parser *p);
+    ARGH__NODISCARD ARGH__DEF const argh_error *argh_last_error(const argh_parser *p);
 
     /* Formats the last error as one line without a trailing newline.
      * Returns the full length, like snprintf; output is truncated to fit. */

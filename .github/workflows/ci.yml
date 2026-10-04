@@ -28,6 +28,8 @@ jobs:
       - run: make CC=${{ matrix.cc }} smoke
       - run: make CXX=${{ matrix.cc == 'gcc' && 'g++' || 'clang++' }} cxx
       - run: make CC=${{ matrix.cc }} bench
+      - name: C23 (the tests, and [[nodiscard]] on argh_parse)
+        run: make CC=${{ matrix.cc }} c23
 
   sanitizers:
     name: ubuntu / clang / ASan + UBSan
